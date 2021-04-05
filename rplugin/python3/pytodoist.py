@@ -35,6 +35,8 @@ class TasksWorld(List):
 
     def __iter__(self):
         root_tasks = [task for task in self.tasks if task.parent is None]
+        root_tasks = sorted(root_tasks, key=lambda task: task.date)[::-1]
+        # root_tasks = [task for task in root_tasks if task.date >= '2021-04-04']
         for root_task in root_tasks:
             yield from self.__dfs(root_task)
 
@@ -81,6 +83,10 @@ class TaskInfo(todoist.models.Item):
     @property
     def content(self):
         return self.data["content"]
+
+    @property
+    def date(self):
+        return self.data["date_added"]
 
     def __repr__(self) -> str:
         short_content = (
@@ -142,6 +148,7 @@ class Main(object):
         self.tasks[new_content] = new_task
         if update_history:
             self._history_append(prev_state=None, new_state=new_task)
+        self.tasks_world = TasksWorld(self.tasks.values())
         return new_task
 
     def _delete_task(self, content: str, update_history: bool = True):
@@ -150,10 +157,11 @@ class Main(object):
         if update_history:
             self._history_append(prev_state=deepcopy(task), new_state=None)
 
-        #self.nvim.command(f"""echom "About to delete\n{task['content']}" """)
+        # self.nvim.command(f"""echom "About to delete\n{task['content']}" """)
         self.todoist.items.delete(task_id)
         self.todoist.commit()
         del self.tasks[content]
+        self.tasks_world = TasksWorld(self.tasks.values())
 
     def _complete_task(self, content: str, update_history: bool = True):
         task = self.tasks[content]
@@ -166,6 +174,7 @@ class Main(object):
                 prev_state=deepcopy(task), new_state=deepcopy(updated_task)
             )
         del self.tasks[content]
+        self.tasks_world = TasksWorld(self.tasks.values())
 
     # TODO: implement a NamedTuple as history items.
 
@@ -183,9 +192,11 @@ class Main(object):
         if new_content:
             if SMART_TAG and ("@" in new_content or "#" in new_content):
                 updated_task = self._create_task(new_content, update_history=False)
-                if task['parent_id'] is not None:
-                    self.todoist.items.move(updated_task['id'], parent_id=task['parent_id'])
-                    updated_task['parent_id'] = task['parent_id']
+                if task["parent_id"] is not None:
+                    self.todoist.items.move(
+                        updated_task["id"], parent_id=task["parent_id"]
+                    )
+                    updated_task["parent_id"] = task["parent_id"]
                 self.tasks[new_content] = updated_task
 
                 self._delete_task(old_task_content, update_history=False)
@@ -215,11 +226,12 @@ class Main(object):
         if parent_id:
             if parent_id == NULL:
                 parent_id = None
-            self.tasks[old_task_content]['parent_id'] = parent_id
+            self.tasks[old_task_content]["parent_id"] = parent_id
             self.todoist.items.move(task_id, parent_id=parent_id)
             self.todoist.commit()
 
         # return updated_task
+        self.tasks_world = TasksWorld(self.tasks.values())
 
     @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
@@ -244,7 +256,7 @@ class Main(object):
     @neovim.function("DeleteTask", sync=False, range=True)
     def delete_task(self, args, range):
         if self.is_active:
-            lines = self.nvim.current.buffer[range[0]-1:range[1]]
+            lines = self.nvim.current.buffer[range[0] - 1 : range[1]]
             self.nvim.command(f"{range[0]},{range[1]} d")
             for i, line in enumerate(lines):
                 self._delete_task(line.strip())
@@ -270,9 +282,19 @@ class Main(object):
         current_task = self.tasks[line.strip()]
 
         idx = self._get_current_line_index() - 1
-        parent_line = self.nvim.current.buffer[idx - 1]
-        parent_task = self.tasks[parent_line.strip()]
+        if idx == 0:
+            return
+        depth_current_task = self.tasks_world.id_to_task[current_task["id"]].depth
 
+        task_above = None
+        offset, depth_task_above= 0, -1
+        while depth_task_above != depth_current_task:
+            offset += 1
+            line_above = self.nvim.current.buffer[idx - offset]
+            task_above = self.tasks[line_above.strip()]
+            depth_task_above = self.tasks_world.id_to_task[task_above["id"]].depth
+
+        parent_task = task_above
         self.nvim.command(">1")
         self._update_task(current_task, parent_id=parent_task["id"])
 
@@ -343,7 +365,7 @@ class Main(object):
         # If there is a buffer with name 'todoist', we must close it first.
         for buffer in self.nvim.api.list_bufs():
             filepath = Path(buffer.api.get_name())
-            if filepath.name == 'todoist':
+            if filepath.name == "todoist":
                 # We found a 'todoist' buffer. We delete it.
                 self.nvim.api.buf_delete(buffer.number, {"force": True})
                 break
