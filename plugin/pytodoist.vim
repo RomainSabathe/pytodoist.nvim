@@ -3,10 +3,12 @@
 " two different approaches but it is not required you use VimL. Feel free to
 " delete this code and proceed without it.
 
-"nnoremap <buffer><silent> <leader>T :call Dummy()<CR>
+"nnoremap <buffer><silent> <leader>T :call LoadTasks()<CR>
 "nnoremap <buffer><silent> dd :call DeleteTask()<CR>
 nnoremap <silent> <leader>T :call LoadTasks()<CR>
 nnoremap <silent> dd :call DeleteTask()<CR>
 nnoremap <silent> u :call Undo()<CR>
 nnoremap <silent> <c-r> :call Redo()<CR>
 nnoremap <silent> x :call CompleteTask()<CR>
+nnoremap <silent> >> :call MakeChild()<CR>
+nnoremap <silent> << :call UnmakeChild()<CR>
