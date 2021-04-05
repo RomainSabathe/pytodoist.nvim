@@ -148,7 +148,7 @@ class Main(object):
         if update_history:
             self._history_append(prev_state=deepcopy(task), new_state=None)
 
-        # self.nvim.command(f"""echo "About to delete\n{task['content']}" """)
+        #self.nvim.command(f"""echom "About to delete\n{task['content']}" """)
         self.todoist.items.delete(task_id)
         self.todoist.commit()
         del self.tasks[content]
@@ -225,15 +225,13 @@ class Main(object):
                 'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
             )
 
-    @neovim.function("DeleteTask")
-    def delete_task(self, args):
+    @neovim.function("DeleteTask", sync=False, range=True)
+    def delete_task(self, args, range):
         if self.is_active:
-            mode = self.nvim.api.get_mode()["mode"]
-            if mode == "n":
-                line = self.nvim.current.line
+            lines = self.nvim.current.buffer[range[0]-1:range[1]]
+            self.nvim.command(f"{range[0]},{range[1]} d")
+            for i, line in enumerate(lines):
                 self._delete_task(line.strip())
-                #self.nvim.command("d")
-                self.nvim.api.del_current_line()
         else:
             self.nvim.command(
                 'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
