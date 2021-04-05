@@ -6,30 +6,92 @@ from dataclasses import dataclass
 import neovim
 import todoist
 
+NULL = "null"
 
-class TasksWorld:
-    def __init__(self, tasks: List[todoist.models.Item] = None):
-        self.tasks = []
+
+class TasksWorld(List):
+    def __init__(
+        self, tasks: List[todoist.models.Item], only_show_active_tasks: bool = True
+    ):
+        self._raw_tasks = [
+            task
+            for task in tasks
+            if not (task["is_deleted"] or task["in_history"] or task["date_completed"])
+        ]
+        self.tasks = [TaskInfo(task) for task in self._raw_tasks]
+
         self.id_to_task = {}
+        self.id_to_children_id = {task["id"]: [] for task in self._raw_tasks}
+        self.id_to_depth = {task["id"]: [] for task in self._raw_tasks}
+        self._initialize_tasks()
 
-        if tasks:
-            for task in tasks:
-                self.append(task)
+    def __repr__(self) -> str:
+        return str(self.tasks)
 
-    def append(self, task: todoist.models.Item):
-        pass
+    def __getitem__(self, i):
+        return self.tasks[i]
+
+    def __iter__(self):
+        root_tasks = [task for task in self.tasks if task.parent is None]
+        for root_task in root_tasks:
+            yield from self.__dfs(root_task)
+
+    def _initialize_tasks(self):
+        # Initial pass: connecting the Dict id --> task.
+        for task in self.tasks:
+            self.id_to_task[task.id] = task
+
+        # Second pass: connecting parent to children and vice-versa.
+        for task in self.tasks:
+            if task["parent_id"] is not None:
+                task.parent = self.id_to_task[task["parent_id"]]
+                task.parent.children.append(task)
+
+        # Third pass: determining depth.
+        root_tasks = [task for task in self.tasks if task.parent is None]
+        for root_task in root_tasks:
+            self.__dfs(root_task)  # This sets the depth.
+
+    def __dfs(self, task, depth=0):
+        task.depth = depth
+        yield task
+        for child in task.children:
+            yield from self.__dfs(child, depth + 1)
 
 
-@dataclass
-class TaskInfo:
-    task: todoist.models.Item
-    indentation: int = 0
+class TaskInfo(todoist.models.Item):
+    def __init__(
+        self,
+        task: todoist.models.Item,
+        depth: int = 0,
+        children: List = None,
+        parent=None,
+    ):
+        self.data = task
+        self.depth = depth
+        self.children = children if children is not None else []
+        self.parent = parent
 
     @property
     def id(self):
-        return self.task["id"]
+        return self.data["id"]
 
-NULL = 'null'
+    @property
+    def content(self):
+        return self.data["content"]
+
+    def __repr__(self) -> str:
+        short_content = (
+            self.content if len(self.content) < 50 else f"{self.content[:47]}..."
+        )
+        return f"TaskInfo #{self.id}: {short_content}"
+
+    def __str__(self):
+        buffer = ""
+        for _ in range(self.depth):
+            buffer += "    "
+        buffer += self.content
+        return buffer
 
 
 @neovim.plugin
@@ -147,25 +209,17 @@ class Main(object):
     def load_tasks(self, args):
         if self.is_active:
             self._clear_buffer()
+            self.todoist.sync()
 
             self.tasks = {}
-            is_first_line = True
-
-            for i, item in enumerate(self.todoist.state["items"]):
-                if item["is_deleted"] or item["in_history"] or item["date_completed"]:
-                    continue
-                line = item["content"]
-                if is_first_line:
-                    self.nvim.current.line = line
-                    is_first_line = False
+            self.tasks_world = TasksWorld(self.todoist.state["items"])
+            for i, task in enumerate(self.tasks_world):
+                self.tasks[task.content] = task.data
+                to_print = str(task)
+                if i == 0:
+                    self.nvim.current.line = to_print
                 else:
-                    if item["parent_id"]:
-                        # This task has a parent task. It must be indented.
-                        line = f"   {line}"
-                    self.nvim.current.buffer.append(line)
-                self.tasks[item["content"]] = item
-
-                # self.nvim.current.line = api.state['items'][0]['content']
+                    self.nvim.current.buffer.append(to_print)
         else:
             self.nvim.command(
                 'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
@@ -213,7 +267,7 @@ class Main(object):
         parent_id = current_task["parent_id"]
         parent_tasks = [task for task in self.tasks.values() if task["id"] == parent_id]
         parent_task = parent_tasks[0]  # There should only be one anyway.
-        grand_father_id = parent_task['parent_id']
+        grand_father_id = parent_task["parent_id"]
         if grand_father_id is None:
             # In this lib, None is reserved for no actions. However, having a 'parent_id'
             # that equals to None is a meaningful information. We interpret it as NULL.
