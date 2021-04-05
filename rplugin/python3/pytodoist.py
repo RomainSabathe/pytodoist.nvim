@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import List
 from copy import copy, deepcopy
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ import neovim
 import todoist
 
 NULL = "null"
+SMART_TAG = True
 
 
 class TasksWorld(List):
@@ -179,27 +181,41 @@ class Main(object):
 
         # Changing the 'content'
         if new_content:
-            # Updating the buffer `self.tasks`
-            updated_task = deepcopy(task)
-            updated_task["content"] = new_content
-            if update_history:
-                self._history_append(
-                    prev_state=deepcopy(task), new_state=deepcopy(updated_task)
-                )
+            if SMART_TAG and ("@" in new_content or "#" in new_content):
+                updated_task = self._create_task(new_content, update_history=False)
+                if task['parent_id'] is not None:
+                    self.todoist.items.move(updated_task['id'], parent_id=task['parent_id'])
+                    updated_task['parent_id'] = task['parent_id']
+                self.tasks[new_content] = updated_task
 
-            del self.tasks[old_task_content]
-            self.tasks[new_content] = deepcopy(updated_task)
+                self._delete_task(old_task_content, update_history=False)
+                if update_history:
+                    self._history_append(
+                        prev_state=deepcopy(task), new_state=deepcopy(updated_task)
+                    )
+            else:
+                # Updating the buffer `self.tasks`
+                updated_task = deepcopy(task)
+                updated_task["content"] = new_content
+                if update_history:
+                    self._history_append(
+                        prev_state=deepcopy(task), new_state=deepcopy(updated_task)
+                    )
 
-            # Updating Todoist.
-            # self.nvim.command(f"""echo "About to replace\n{task['content']}\nwith\n{new_content}" """)
-            self.todoist.items.update(task_id, content=new_content)
-            self.todoist.commit()
-            # self.nvim.command(f'echo "Old line was: {self.old_line}. New line is: {self.new_line}"')
+                del self.tasks[old_task_content]
+                self.tasks[new_content] = deepcopy(updated_task)
+
+                # Updating Todoist.
+                # self.nvim.command(f"""echo "About to replace\n{task['content']}\nwith\n{new_content}" """)
+                self.todoist.items.update(task_id, content=new_content)
+                self.todoist.commit()
+                # self.nvim.command(f'echo "Old line was: {self.old_line}. New line is: {self.new_line}"')
 
         # Changing the 'parent'
         if parent_id:
             if parent_id == NULL:
                 parent_id = None
+            self.tasks[old_task_content]['parent_id'] = parent_id
             self.todoist.items.move(task_id, parent_id=parent_id)
             self.todoist.commit()
 
@@ -324,7 +340,13 @@ class Main(object):
         self.nvim.command("red")
 
     def _clear_buffer(self):
-        #self.nvim.api.buf_delete(0, {"force": True})
+        # If there is a buffer with name 'todoist', we must close it first.
+        for buffer in self.nvim.api.list_bufs():
+            filepath = Path(buffer.api.get_name())
+            if filepath.name == 'todoist':
+                # We found a 'todoist' buffer. We delete it.
+                self.nvim.api.buf_delete(buffer.number, {"force": True})
+                break
         self.nvim.api.command("enew")
         self.nvim.api.command("set filetype=todoist")
         self.nvim.api.command("file todoist")  # Set the filename.
