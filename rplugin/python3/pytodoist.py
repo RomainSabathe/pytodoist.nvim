@@ -111,14 +111,14 @@ class Main(object):
     # def autocmd_more_test(self, filename):
     #    self.nvim.current.line = f"I have no idea what I'm doing. Oh, btw: {filename}"
 
-    @neovim.autocmd("InsertEnter", sync=False)
+    @neovim.autocmd("InsertEnter", pattern="todoist", sync=False)
     def register_current_line(self):
         if self.is_active:
             line = self.nvim.current.line.strip()
             self.current_task = self.tasks[line] if line else None
             # self.current_task = self.tasks[self._get_current_line_index() - 1]
 
-    @neovim.autocmd("InsertLeave", sync=False)
+    @neovim.autocmd("InsertLeave", pattern="todoist", sync=False)
     def register_updated_line(self):
         if self.is_active:
             new_task_content = self.nvim.current.line.strip()
@@ -205,7 +205,7 @@ class Main(object):
 
         # return updated_task
 
-    @neovim.function("LoadTasks")
+    @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
         if self.is_active:
             self._clear_buffer()
@@ -228,9 +228,12 @@ class Main(object):
     @neovim.function("DeleteTask")
     def delete_task(self, args):
         if self.is_active:
-            line = self.nvim.current.line
-            self._delete_task(line.strip())
-            self.nvim.command("d")
+            mode = self.nvim.api.get_mode()["mode"]
+            if mode == "n":
+                line = self.nvim.current.line
+                self._delete_task(line.strip())
+                #self.nvim.command("d")
+                self.nvim.api.del_current_line()
         else:
             self.nvim.command(
                 'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
@@ -323,7 +326,10 @@ class Main(object):
         self.nvim.command("red")
 
     def _clear_buffer(self):
-        self.nvim.api.buf_delete(0, {"force": True})
+        #self.nvim.api.buf_delete(0, {"force": True})
+        self.nvim.api.command("enew")
+        self.nvim.api.command("set filetype=todoist")
+        self.nvim.api.command("file todoist")  # Set the filename.
 
     def _get_current_line_index(self):
         return self.nvim.eval("line('.')")
