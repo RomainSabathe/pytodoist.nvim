@@ -149,6 +149,7 @@ class Main(object):
         if update_history:
             self._history_append(prev_state=None, new_state=new_task)
         self.tasks_world = TasksWorld(self.tasks.values())
+        self._refresh_colors()
         return new_task
 
     def _delete_task(self, content: str, update_history: bool = True):
@@ -232,15 +233,46 @@ class Main(object):
 
         # return updated_task
         self.tasks_world = TasksWorld(self.tasks.values())
+        self._refresh_colors()
 
     @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
         if self.is_active:
             self._clear_buffer()
             self.todoist.sync()
+            self._setup_colors()
+
+            self.project_name_to_id = {
+                project["name"]: project["id"]
+                for project in self.todoist.state["projects"]
+            }
+            self.label_name_to_id = {
+                label["name"]: label["id"] for label in self.todoist.state["labels"]
+            }
+            tasks = self.todoist.state["items"]
+            tasks = [
+                task
+                for task in tasks
+                # if (task["project_id"] == self.project_name_to_id["Inbox"])
+                # and (task["due"] is None)
+                # and (len(task["labels"]) == 0)
+            ]
+
+            # tasks = pd.DataFrame([item.data for item in self.todoist.state["items"]])
+            # projects = pd.DataFrame(
+            #     [project.data for project in self.todoist.state["projects"]]
+            # )
+            # tasks = tasks.merge(
+            #     projects.set_index("id").rename(columns={"name": "project_name"})[
+            #         ["project_name"]
+            #     ],
+            #     left_on="project_id",
+            #     right_index=True,
+            #     suffixes=("", "_project"),
+            # )
 
             self.tasks = {}
-            self.tasks_world = TasksWorld(self.todoist.state["items"])
+            self.tasks_world = TasksWorld(tasks)
             for i, task in enumerate(self.tasks_world):
                 self.tasks[task.content] = task.data
                 to_print = str(task)
@@ -248,10 +280,33 @@ class Main(object):
                     self.nvim.current.line = to_print
                 else:
                     self.nvim.current.buffer.append(to_print)
+
+            self._refresh_colors()
         else:
             self.nvim.command(
                 'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
             )
+
+    def _setup_colors(self):
+        for project in self.todoist.state["projects"]:
+            project_name = project["name"]
+            project_color = COLORS_ID_TO_HEX[project["color"]]
+            self.nvim.command(
+                # f"highlight Project{project_name} ctermbg={project_color} guibg={project_color}"
+                f"highlight Project{project_name} guifg={project_color}"
+            )
+
+    def _refresh_colors(self):
+        buffer = self.nvim.current.buffer
+        for i, line in enumerate(buffer):
+            task = self.tasks[line.strip()]
+            project_id = task["project_id"]
+            project_name = [
+                project["name"]
+                for project in self.todoist.state["projects"]
+                if project["id"] == project_id
+            ][0]
+            buffer.add_highlight(f"Project{project_name}", i, 0, -1)
 
     @neovim.function("DeleteTask", sync=False, range=True)
     def delete_task(self, args, range):
@@ -287,7 +342,7 @@ class Main(object):
         depth_current_task = self.tasks_world.id_to_task[current_task["id"]].depth
 
         task_above = None
-        offset, depth_task_above= 0, -1
+        offset, depth_task_above = 0, -1
         while depth_task_above != depth_current_task:
             offset += 1
             line_above = self.nvim.current.buffer[idx - offset]
@@ -378,3 +433,27 @@ class Main(object):
 
     def _get_number_of_lines(self):
         return self.nvim.current.buffer.api.line_count()
+
+
+COLORS_ID_TO_HEX = {
+    30: "#b8256f",
+    31: "#db4035",
+    32: "#ff9933",
+    33: "#fad000",
+    34: "#afb83b",
+    35: "#7ecc49",
+    36: "#299438",
+    37: "#6accbc",
+    38: "#158fad",
+    39: "#14aaf5",
+    40: "#96c3eb",
+    41: "#4073ff",
+    42: "#884dff",
+    43: "#af38eb",
+    44: "#eb96eb",
+    45: "#e05194",
+    46: "#ff8d85",
+    47: "#808080",
+    48: "#b8b8b8",
+    49: "#ccac93",
+}

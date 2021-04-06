@@ -13,3 +13,6 @@ nnoremap <silent> <leader>T :call LoadTasks()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> x :call CompleteTask()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> >> :call MakeChild()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> << :call UnmakeChild()<CR>
+
+":highlight MyGroup ctermbg=green guibg=green
+":let m = matchadd("MyGroup", "something")
