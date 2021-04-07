@@ -433,6 +433,16 @@ class Main(object):
             for idx in idx_to_delete[::-1]:
                 del tasks[idx]
 
+        # Special filtering: Removing everything that has a label
+        if "no label" in query:
+            idx_to_delete = []
+            for i, task in enumerate(tasks):
+                if task["labels"]:
+                    idx_to_delete.append(i)
+                    continue
+            for idx in idx_to_delete[::-1]:
+                del tasks[idx]
+
         # Fetching the labels.
         pattern = r"(not)? @(?P<label_name>\w+)"
         for (is_negation, label_name) in re.findall(pattern, query):

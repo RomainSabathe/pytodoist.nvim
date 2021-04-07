@@ -46,6 +46,7 @@ def test_filter_tasks():
     tasks = api.state["items"]
     query = "#perso and not @someday and not due"
     query = "#pro and not @someday and @documentation"
+    query = "#pro and no label"
 
     import re
     from copy import deepcopy
@@ -64,6 +65,16 @@ def test_filter_tasks():
         for i, task in enumerate(tasks):
             if task["project_id"] != project_id:
                 idx_to_delete.append(i)
+        for idx in idx_to_delete[::-1]:
+            del tasks[idx]
+
+    # Special filtering: Removing everything that has a label
+    if "no label" in query:
+        idx_to_delete = []
+        for i, task in enumerate(tasks):
+            if task["labels"]:
+                idx_to_delete.append(i)
+                continue
         for idx in idx_to_delete[::-1]:
             del tasks[idx]
 
