@@ -110,14 +110,12 @@ class TaskInfo(todoist.models.Item):
 class Main(object):
     def __init__(self, nvim):
         self.nvim = nvim
-        self.is_active = os.environ.get("DEBUG_TODOIST", False)
         self.history = []
         self.history_index = 1
-        if self.is_active:
-            if not os.environ.get("TODOIST_API_KEY"):
-                raise ValueError("Can't find the TODOIST_API_KEY env var.")
-            self.todoist = todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY"))
-            self.todoist.sync()
+        if not os.environ.get("TODOIST_API_KEY"):
+            raise ValueError("Can't find the TODOIST_API_KEY env var.")
+        self.todoist = todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY"))
+        self.todoist.sync()
 
     # @neovim.autocmd('BufEnter', eval='expand("<afile")', pattern='*.py', sync=True)
     # def autocmd_more_test(self, filename):
@@ -125,20 +123,18 @@ class Main(object):
 
     @neovim.autocmd("InsertEnter", pattern="todoist", sync=False)
     def register_current_line(self):
-        if self.is_active:
-            line = self.nvim.current.line.strip()
-            self.current_task = self.tasks[line] if line else None
-            # self.current_task = self.tasks[self._get_current_line_index() - 1]
+        line = self.nvim.current.line.strip()
+        self.current_task = self.tasks[line] if line else None
+        # self.current_task = self.tasks[self._get_current_line_index() - 1]
 
     @neovim.autocmd("InsertLeave", pattern="todoist", sync=False)
     def register_updated_line(self):
-        if self.is_active:
-            new_task_content = self.nvim.current.line.strip()
-            if self.current_task is not None:
-                updated_task = self._update_task(self.current_task, new_task_content)
-            else:
-                if new_task_content:
-                    updated_task = self._create_task(new_task_content)
+        new_task_content = self.nvim.current.line.strip()
+        if self.current_task is not None:
+            updated_task = self._update_task(self.current_task, new_task_content)
+        else:
+            if new_task_content:
+                updated_task = self._create_task(new_task_content)
 
     def _history_append(self, prev_state, new_state):
         self.history_index = max(1, self.history_index)
@@ -241,51 +237,46 @@ class Main(object):
 
     @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
-        if self.is_active:
-            self._clear_buffer()
-            self.todoist.sync()
-            self._setup_colors()
+        self._clear_buffer()
+        self.todoist.sync()
+        self._setup_colors()
 
-            self.project_name_to_id = {
-                project["name"]: project["id"]
-                for project in self.todoist.state["projects"]
-            }
-            self.label_name_to_id = {
-                label["name"]: label["id"] for label in self.todoist.state["labels"]
-            }
-            tasks = self.todoist.state["items"]
-            if args:
-                query = args[0]
-                tasks = self._filter_tasks(query, tasks)
+        self.project_name_to_id = {
+            project["name"]: project["id"]
+            for project in self.todoist.state["projects"]
+        }
+        self.label_name_to_id = {
+            label["name"]: label["id"] for label in self.todoist.state["labels"]
+        }
+        tasks = self.todoist.state["items"]
+        if args:
+            query = args[0]
+            tasks = self._filter_tasks(query, tasks)
 
-            # tasks = pd.DataFrame([item.data for item in self.todoist.state["items"]])
-            # projects = pd.DataFrame(
-            #     [project.data for project in self.todoist.state["projects"]]
-            # )
-            # tasks = tasks.merge(
-            #     projects.set_index("id").rename(columns={"name": "project_name"})[
-            #         ["project_name"]
-            #     ],
-            #     left_on="project_id",
-            #     right_index=True,
-            #     suffixes=("", "_project"),
-            # )
+        # tasks = pd.DataFrame([item.data for item in self.todoist.state["items"]])
+        # projects = pd.DataFrame(
+        #     [project.data for project in self.todoist.state["projects"]]
+        # )
+        # tasks = tasks.merge(
+        #     projects.set_index("id").rename(columns={"name": "project_name"})[
+        #         ["project_name"]
+        #     ],
+        #     left_on="project_id",
+        #     right_index=True,
+        #     suffixes=("", "_project"),
+        # )
 
-            self.tasks = {}
-            self.tasks_world = TasksWorld(tasks)
-            for i, task in enumerate(self.tasks_world):
-                self.tasks[task.content] = task.data
-                to_print = str(task)
-                if i == 0:
-                    self.nvim.current.line = to_print
-                else:
-                    self.nvim.current.buffer.append(to_print)
+        self.tasks = {}
+        self.tasks_world = TasksWorld(tasks)
+        for i, task in enumerate(self.tasks_world):
+            self.tasks[task.content] = task.data
+            to_print = str(task)
+            if i == 0:
+                self.nvim.current.line = to_print
+            else:
+                self.nvim.current.buffer.append(to_print)
 
-            self._refresh_colors()
-        else:
-            self.nvim.command(
-                'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
-            )
+        self._refresh_colors()
 
     def _setup_colors(self):
         for project in self.todoist.state["projects"]:
@@ -310,26 +301,16 @@ class Main(object):
 
     @neovim.function("DeleteTask", sync=False, range=True)
     def delete_task(self, args, range):
-        if self.is_active:
-            lines = self.nvim.current.buffer[range[0] - 1 : range[1]]
-            self.nvim.command(f"{range[0]},{range[1]} d")
-            for i, line in enumerate(lines):
-                self._delete_task(line.strip())
-        else:
-            self.nvim.command(
-                'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
-            )
+        lines = self.nvim.current.buffer[range[0] - 1 : range[1]]
+        self.nvim.command(f"{range[0]},{range[1]} d")
+        for i, line in enumerate(lines):
+            self._delete_task(line.strip())
 
     @neovim.function("CompleteTask")
     def complete_task(self, args):
-        if self.is_active:
-            line = self.nvim.current.line
-            self._complete_task(line)
-            self.nvim.command("d")
-        else:
-            self.nvim.command(
-                'echo "The env var DEBUG_TODOIST is not set. Not doing anything."'
-            )
+        line = self.nvim.current.line
+        self._complete_task(line)
+        self.nvim.command("d")
 
     @neovim.function("MakeChild")
     def make_child(self, args):
