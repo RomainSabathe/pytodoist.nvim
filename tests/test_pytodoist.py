@@ -35,3 +35,54 @@ def test_test2():
         right_index=True,
         suffixes=("", "_project"),
     )
+
+
+def test_filter_tasks():
+    if not os.environ.get("TODOIST_API_KEY"):
+        raise ValueError("Can't find the TODOIST_API_KEY env var.")
+    api = todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY"))
+    api.sync()
+
+    tasks = api.state["items"]
+    query = "#perso and not @someday and not due"
+    query = "#pro and @someday"
+
+    import re
+    from copy import deepcopy
+
+    tasks = deepcopy(tasks)
+
+    # Fetching the projects.
+    pattern = r"#(?P<project_name>\w+)"
+    for project_name in re.findall(pattern, query):
+        project_id = [
+            project["id"]
+            for project in api.state["projects"]
+            if project["name"].lower() == project_name
+        ][0]
+        idx_to_delete = []
+        for i, task in enumerate(tasks):
+            if task["project_id"] != project_id:
+                idx_to_delete.append(i)
+        for idx in idx_to_delete[::-1]:
+            del tasks[idx]
+
+    # Fetching the labels.
+    pattern = r"@(?P<label_name>\w+)"
+    for label_name in re.findall(pattern, query):
+        label_id = [
+            label["id"]
+            for label in api.state["labels"]
+            if label["name"].lower() == label_name
+        ][0]
+        idx_to_delete = []
+        for i, task in enumerate(tasks):
+            if any([candidate == label_id for candidate in task["labels"]]):
+                continue
+            idx_to_delete.append(i)
+        for idx in idx_to_delete[::-1]:
+            del tasks[idx]
+
+    task_world = TasksWorld(tasks)
+    for task in task_world:
+        print(str(task))

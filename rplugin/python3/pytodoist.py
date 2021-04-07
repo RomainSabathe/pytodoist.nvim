@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from typing import List
 from copy import copy, deepcopy
@@ -48,8 +49,11 @@ class TasksWorld(List):
         # Second pass: connecting parent to children and vice-versa.
         for task in self.tasks:
             if task["parent_id"] is not None:
-                task.parent = self.id_to_task[task["parent_id"]]
-                task.parent.children.append(task)
+                try:
+                    task.parent = self.id_to_task[task["parent_id"]]
+                    task.parent.children.append(task)
+                except KeyError:
+                    continue
 
         # Third pass: determining depth.
         root_tasks = [task for task in self.tasks if task.parent is None]
@@ -250,13 +254,9 @@ class Main(object):
                 label["name"]: label["id"] for label in self.todoist.state["labels"]
             }
             tasks = self.todoist.state["items"]
-            tasks = [
-                task
-                for task in tasks
-                # if (task["project_id"] == self.project_name_to_id["Inbox"])
-                # and (task["due"] is None)
-                # and (len(task["labels"]) == 0)
-            ]
+            if args:
+                query = args[0]
+                tasks = self._filter_tasks(query, tasks)
 
             # tasks = pd.DataFrame([item.data for item in self.todoist.state["items"]])
             # projects = pd.DataFrame(
@@ -433,6 +433,43 @@ class Main(object):
 
     def _get_number_of_lines(self):
         return self.nvim.current.buffer.api.line_count()
+
+    def _filter_tasks(self, query, tasks):
+        tasks = deepcopy(tasks)
+
+        # Fetching the projects.
+        pattern = r"#(?P<project_name>\w+)"
+        for project_name in re.findall(pattern, query):
+            project_id = [
+                project["id"]
+                for project in self.todoist.state["projects"]
+                if project["name"].lower() == project_name
+            ][0]
+            idx_to_delete = []
+            for i, task in enumerate(tasks):
+                if task["project_id"] != project_id:
+                    idx_to_delete.append(i)
+            for idx in idx_to_delete[::-1]:
+                del tasks[idx]
+
+        # Fetching the labels.
+        pattern = r"@(?P<label_name>\w+)"
+        for label_name in re.findall(pattern, query):
+            label_id = [
+                label["id"]
+                for label in self.todoist.state["labels"]
+                if label["name"].lower() == label_name
+            ][0]
+            idx_to_delete = []
+            for i, task in enumerate(tasks):
+                if any([candidate == label_id for candidate in task["labels"]]):
+                    continue
+                idx_to_delete.append(i)
+            for idx in idx_to_delete[::-1]:
+                del tasks[idx]
+
+        return tasks
+
 
 
 COLORS_ID_TO_HEX = {
