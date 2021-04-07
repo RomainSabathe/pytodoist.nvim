@@ -45,7 +45,7 @@ def test_filter_tasks():
 
     tasks = api.state["items"]
     query = "#perso and not @someday and not due"
-    query = "#pro and @someday"
+    query = "#pro and not @someday and @documentation"
 
     import re
     from copy import deepcopy
@@ -68,8 +68,8 @@ def test_filter_tasks():
             del tasks[idx]
 
     # Fetching the labels.
-    pattern = r"@(?P<label_name>\w+)"
-    for label_name in re.findall(pattern, query):
+    pattern = r"(not)? @(?P<label_name>\w+)"
+    for (is_negation, label_name) in re.findall(pattern, query):
         label_id = [
             label["id"]
             for label in api.state["labels"]
@@ -78,8 +78,11 @@ def test_filter_tasks():
         idx_to_delete = []
         for i, task in enumerate(tasks):
             if any([candidate == label_id for candidate in task["labels"]]):
+                if is_negation:
+                    idx_to_delete.append(i)
                 continue
-            idx_to_delete.append(i)
+            if not is_negation:
+                idx_to_delete.append(i)
         for idx in idx_to_delete[::-1]:
             del tasks[idx]
 
