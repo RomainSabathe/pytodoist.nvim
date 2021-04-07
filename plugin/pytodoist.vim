@@ -7,12 +7,12 @@
 "nnoremap <buffer><silent> dd :call DeleteTask()<CR>
 nnoremap <silent> <leader>T :call LoadTasks()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> dd :call DeleteTask()<CR>
-:autocmd FileType todoist vnoremap <buffer><silent> d :call DeleteTask()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> u :call Undo()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> <c-r> :call Redo()<CR>
-:autocmd FileType todoist nnoremap <buffer><silent> x :call CompleteTask()<CR>
+:autocmd FileType todoist nnoremap <buffer><silent> X :call CompleteTask()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> >> :call MakeChild()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> << :call UnmakeChild()<CR>
+:autocmd FileType todoist vnoremap <buffer><silent> d :call DeleteTask()<CR>
 
 ":highlight MyGroup ctermbg=green guibg=green
 ":let m = matchadd("MyGroup", "something")
