@@ -329,11 +329,12 @@ class Main(object):
     def _setup_colors(self):
         for project in self.todoist.state["projects"]:
             project_name = project["name"].replace(" ", "").replace("-", "")
-            project_color = COLORS_ID_TO_HEX[project["color"]]
+            project_color = BG_COLORS_ID_TO_HEX[project["color"]]
+            fg_color = FG_COLORS_ID_TO_HEX[project["color"]]
             # self.nvim.command(f"""echom '{project_name}'""")
             self.nvim.command(
                 # f"highlight Project{project_name} ctermbg={project_color} guibg={project_color}"
-                f"highlight Project{project_name} guifg={project_color}"
+                f"highlight Project{project_name} guibg={project_color} guifg={fg_color}"
             )
 
     def _refresh_colors(self):
@@ -522,7 +523,30 @@ class Main(object):
         return tasks
 
 
-COLORS_ID_TO_HEX = {
+def find_best_fg_colour(bg_color):
+    from colour import Color
+    return "#ffffff" if Color(bg_color).luminance < 0.5 else "#000000"
+
+    best_score, best_color = 0.0, None
+    for luminance in range(255):
+        val = luminance / 255
+        proposal = Color(rgb=(val, val, val))
+        score = contrast_score(proposal, bg_color)
+        if score > best_score:
+            best_color = proposal.hex
+    return best_color
+
+
+def contrast_score(fg_color, bg_color):
+    from colour import Color
+
+    score = (Color(fg_color).luminance + 0.05) / (Color(bg_color).luminance + 0.05)
+    if score < 1.0:
+        score = 1 / score
+    return score
+
+
+BG_COLORS_ID_TO_HEX = {
     30: "#b8256f",
     31: "#db4035",
     32: "#ff9933",
@@ -543,4 +567,8 @@ COLORS_ID_TO_HEX = {
     47: "#808080",
     48: "#b8b8b8",
     49: "#ccac93",
+}
+
+FG_COLORS_ID_TO_HEX = {
+    id: find_best_fg_colour(color) for id, color in BG_COLORS_ID_TO_HEX.items()
 }
