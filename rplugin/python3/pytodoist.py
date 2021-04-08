@@ -280,8 +280,9 @@ class Main(object):
 
     def _setup_colors(self):
         for project in self.todoist.state["projects"]:
-            project_name = project["name"]
+            project_name = project["name"].replace(" ", "").replace("-", "")
             project_color = COLORS_ID_TO_HEX[project["color"]]
+            self.nvim.command(f"""echom '{project_name}'""")
             self.nvim.command(
                 # f"highlight Project{project_name} ctermbg={project_color} guibg={project_color}"
                 f"highlight Project{project_name} guifg={project_color}"
@@ -296,7 +297,7 @@ class Main(object):
                 project["name"]
                 for project in self.todoist.state["projects"]
                 if project["id"] == project_id
-            ][0]
+            ][0].replace(" ", "").replace("-", "")
             buffer.add_highlight(f"Project{project_name}", i, 0, -1)
 
     @neovim.function("DeleteTask", sync=False, range=True)
@@ -425,7 +426,7 @@ class Main(object):
             project_id = [
                 project["id"]
                 for project in self.todoist.state["projects"]
-                if project["name"].lower() == project_name.lower()
+                if project["name"].lower() == project_name
             ][0]
             idx_to_delete = []
             for i, task in enumerate(tasks):
