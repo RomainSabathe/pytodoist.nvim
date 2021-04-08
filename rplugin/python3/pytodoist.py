@@ -12,6 +12,44 @@ NULL = "null"
 SMART_TAG = True
 
 
+class World:
+    def __init__(self, todoist_api):
+        self.todoist = todoist_api
+        self.projects = self._init_projects()
+
+        self.project_id_to_name = {
+            project["id"]: project["name"] for project in self.todoist.state["projects"]
+        }
+
+    def _init_projects(self):
+        project_to_tasks = {
+            project["id"]: [] for project in self.todoist.state["projects"]
+        }
+        for task in self.itertasks():
+            project_id = task["project_id"]
+            project_to_tasks[project_id].append(task)
+
+        return {
+            project_id: TasksWorld(tasks)
+            for (project_id, tasks) in project_to_tasks.items()
+        }
+
+    def iterprint(self):
+        for project_id, task_world in self.projects.items():
+            project_name = self.project_id_to_name[project_id]
+            yield project_name
+            yield "=" * len(project_name)
+            yield from task_world.iterprint()
+            yield ""  # Skipping a line.
+
+    def itertasks(self):
+        yield from [
+            task
+            for task in self.todoist.state["items"]
+            if not (task["is_deleted"] or task["in_history"] or task["date_completed"])
+        ]
+
+
 class TasksWorld(List):
     def __init__(
         self, tasks: List[todoist.models.Item], only_show_active_tasks: bool = True
@@ -40,6 +78,10 @@ class TasksWorld(List):
         # root_tasks = [task for task in root_tasks if task.date >= '2021-04-04']
         for root_task in root_tasks:
             yield from self.__dfs(root_task)
+
+    def iterprint(self):
+        for task in self:
+            yield str(task)
 
     def _initialize_tasks(self):
         # Initial pass: connecting the Dict id --> task.
@@ -242,8 +284,7 @@ class Main(object):
         self._setup_colors()
 
         self.project_name_to_id = {
-            project["name"]: project["id"]
-            for project in self.todoist.state["projects"]
+            project["name"]: project["id"] for project in self.todoist.state["projects"]
         }
         self.label_name_to_id = {
             label["name"]: label["id"] for label in self.todoist.state["labels"]
@@ -266,15 +307,22 @@ class Main(object):
         #     suffixes=("", "_project"),
         # )
 
-        self.tasks = {}
+        self.tasks = {task["content"]: task for task in tasks}
         self.tasks_world = TasksWorld(tasks)
-        for i, task in enumerate(self.tasks_world):
-            self.tasks[task.content] = task.data
-            to_print = str(task)
+        self.world = World(self.todoist)
+        for i, line in enumerate(self.world.iterprint()):
             if i == 0:
-                self.nvim.current.line = to_print
+                self.nvim.current.line = line
             else:
-                self.nvim.current.buffer.append(to_print)
+                self.nvim.current.buffer.append(line)
+
+        # for i, task in enumerate(self.tasks_world):
+        #     self.tasks[task.content] = task.data
+        #     to_print = str(task)
+        #     if i == 0:
+        #         self.nvim.current.line = to_print
+        #     else:
+        #         self.nvim.current.buffer.append(to_print)
 
         self._refresh_colors()
 
@@ -282,7 +330,7 @@ class Main(object):
         for project in self.todoist.state["projects"]:
             project_name = project["name"].replace(" ", "").replace("-", "")
             project_color = COLORS_ID_TO_HEX[project["color"]]
-            self.nvim.command(f"""echom '{project_name}'""")
+            # self.nvim.command(f"""echom '{project_name}'""")
             self.nvim.command(
                 # f"highlight Project{project_name} ctermbg={project_color} guibg={project_color}"
                 f"highlight Project{project_name} guifg={project_color}"
@@ -291,13 +339,20 @@ class Main(object):
     def _refresh_colors(self):
         buffer = self.nvim.current.buffer
         for i, line in enumerate(buffer):
-            task = self.tasks[line.strip()]
+            task = self.tasks.get(line.strip())
+            if task is None:
+                # No higlighting for this line.
+                continue
             project_id = task["project_id"]
-            project_name = [
-                project["name"]
-                for project in self.todoist.state["projects"]
-                if project["id"] == project_id
-            ][0].replace(" ", "").replace("-", "")
+            project_name = (
+                [
+                    project["name"]
+                    for project in self.todoist.state["projects"]
+                    if project["id"] == project_id
+                ][0]
+                .replace(" ", "")
+                .replace("-", "")
+            )
             buffer.add_highlight(f"Project{project_name}", i, 0, -1)
 
     @neovim.function("DeleteTask", sync=False, range=True)
@@ -404,7 +459,7 @@ class Main(object):
             filepath = Path(buffer.api.get_name())
             if filepath.name == "todoist":
                 # We found a 'todoist' buffer. We delete it.
-                #self.nvim.api.buf_delete(buffer.number, {"force": True})
+                # self.nvim.api.buf_delete(buffer.number, {"force": True})
                 self.nvim.command(f"bdelete! {buffer.number}")
                 break
         self.nvim.api.command("enew")
@@ -465,7 +520,6 @@ class Main(object):
                 del tasks[idx]
 
         return tasks
-
 
 
 COLORS_ID_TO_HEX = {
