@@ -403,7 +403,8 @@ class Main(object):
             filepath = Path(buffer.api.get_name())
             if filepath.name == "todoist":
                 # We found a 'todoist' buffer. We delete it.
-                self.nvim.api.buf_delete(buffer.number, {"force": True})
+                #self.nvim.api.buf_delete(buffer.number, {"force": True})
+                self.nvim.command(f"bdelete! {buffer.number}")
                 break
         self.nvim.api.command("enew")
         self.nvim.api.command("set filetype=todoist")
