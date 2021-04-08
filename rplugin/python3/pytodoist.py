@@ -425,7 +425,7 @@ class Main(object):
             project_id = [
                 project["id"]
                 for project in self.todoist.state["projects"]
-                if project["name"].lower() == project_name
+                if project["name"].lower() == project_name.lower()
             ][0]
             idx_to_delete = []
             for i, task in enumerate(tasks):
