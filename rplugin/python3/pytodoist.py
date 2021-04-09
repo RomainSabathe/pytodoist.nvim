@@ -74,7 +74,9 @@ class TasksWorld(List):
 
     def __iter__(self):
         root_tasks = [task for task in self.tasks if task.parent is None]
+        # TODO: have multiple sorting options?
         root_tasks = sorted(root_tasks, key=lambda task: task.date)[::-1]
+        root_tasks = sorted(root_tasks, key=lambda task: task["child_order"])
         # root_tasks = [task for task in root_tasks if task.date >= '2021-04-04']
         for root_task in root_tasks:
             yield from self.__dfs(root_task)
@@ -168,6 +170,11 @@ class Main(object):
         line = self.nvim.current.line.strip()
         self.current_task = self.tasks[line] if line else None
         # self.current_task = self.tasks[self._get_current_line_index() - 1]
+
+    @neovim.autocmd("CursorMoved,CursorMovedI", pattern="todoist", sync=False)
+    def on_move(self):
+        if self.last_position is None:
+            self.last_position = self._get_current_line_index()
 
     @neovim.autocmd("InsertLeave", pattern="todoist", sync=False)
     def register_updated_line(self):
@@ -330,11 +337,11 @@ class Main(object):
         for project in self.todoist.state["projects"]:
             project_name = project["name"].replace(" ", "").replace("-", "")
             project_color = BG_COLORS_ID_TO_HEX[project["color"]]
-            fg_color = FG_COLORS_ID_TO_HEX[project["color"]]
+            # fg_color = FG_COLORS_ID_TO_HEX[project["color"]]
             # self.nvim.command(f"""echom '{project_name}'""")
             self.nvim.command(
                 # f"highlight Project{project_name} ctermbg={project_color} guibg={project_color}"
-                f"highlight Project{project_name} guibg={project_color} guifg={fg_color}"
+                f"highlight Project{project_name} guifg={project_color}"
             )
 
     def _refresh_colors(self):
@@ -525,6 +532,7 @@ class Main(object):
 
 def find_best_fg_colour(bg_color):
     from colour import Color
+
     return "#ffffff" if Color(bg_color).luminance < 0.5 else "#000000"
 
     best_score, best_color = 0.0, None
@@ -569,6 +577,6 @@ BG_COLORS_ID_TO_HEX = {
     49: "#ccac93",
 }
 
-FG_COLORS_ID_TO_HEX = {
-    id: find_best_fg_colour(color) for id, color in BG_COLORS_ID_TO_HEX.items()
-}
+# FG_COLORS_ID_TO_HEX = {
+#     id: find_best_fg_colour(color) for id, color in BG_COLORS_ID_TO_HEX.items()
+# }
