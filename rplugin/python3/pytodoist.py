@@ -161,6 +161,8 @@ class Main(object):
         self.todoist = todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY"))
         self.todoist.sync()
 
+        # self.last_position = None
+
     # @neovim.autocmd('BufEnter', eval='expand("<afile")', pattern='*.py', sync=True)
     # def autocmd_more_test(self, filename):
     #    self.nvim.current.line = f"I have no idea what I'm doing. Oh, btw: {filename}"
@@ -171,10 +173,10 @@ class Main(object):
         self.current_task = self.tasks[line] if line else None
         # self.current_task = self.tasks[self._get_current_line_index() - 1]
 
-    @neovim.autocmd("CursorMoved,CursorMovedI", pattern="todoist", sync=False)
-    def on_move(self):
-        if self.last_position is None:
-            self.last_position = self._get_current_line_index()
+    # @neovim.autocmd("CursorMoved,CursorMovedI", pattern="todoist", sync=False)
+    # def on_move(self):
+    #     if self.last_position is None:
+    #         self.last_position = self._get_current_line_index()
 
     @neovim.autocmd("InsertLeave", pattern="todoist", sync=False)
     def register_updated_line(self):
@@ -335,7 +337,9 @@ class Main(object):
 
     def _setup_colors(self):
         for project in self.todoist.state["projects"]:
-            project_name = project["name"].replace(" ", "").replace("-", "")
+            project_name = (
+                project["name"].replace(" ", "").replace("-", "").replace(".", "")
+            )
             project_color = BG_COLORS_ID_TO_HEX[project["color"]]
             # fg_color = FG_COLORS_ID_TO_HEX[project["color"]]
             # self.nvim.command(f"""echom '{project_name}'""")
@@ -360,6 +364,7 @@ class Main(object):
                 ][0]
                 .replace(" ", "")
                 .replace("-", "")
+                .replace(".", "")
             )
             buffer.add_highlight(f"Project{project_name}", i, 0, -1)
 
