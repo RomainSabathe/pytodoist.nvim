@@ -4,7 +4,7 @@ import pytest
 import todoist
 import pandas as pd
 
-from rplugin.python3.pytodoist import TasksWorld, World
+from rplugin.python3.pytodoist import TasksWorld, World, AddDiff, get_diffs, interpret_raw_diff
 
 
 def test_initialize_task_world(todoist_api):
@@ -90,6 +90,8 @@ def test_filter_tasks(todoist_api):
 
 def test_initialize_world(todoist_api):
     world = World(todoist_api)
+    for line in world:
+        assert "\n" not in line  # we can't add lines that have "\n" to the buffer.
     print(world.projects)
 
 
@@ -97,6 +99,72 @@ def test_world_iterprint(todoist_api):
     world = World(todoist_api)
     for line in world.iterprint():
         print(line)
+
+
+def test_add_task():
+    before = """
+Project 1
+=========
+Task 1
+Task 2
+
+Project 2
+=========
+Task 3
+Task 4
+
+Project 3
+=========
+Task 5
+Task 6
+"""
+    before = before[1:-1]
+
+    after = """
+Project 1
+=========
+Task 1
+Task 2
+
+Project 2
+=========
+Task 3
+Task 7
+Task 4
+
+Project 3
+=========
+Task 5
+Task 6
+"""
+    after = after[1:-1]
+
+    diffs = get_diffs(before, after)
+    assert len(diffs) == 1
+
+    diff = diffs[0]
+    assert isinstance(diff, AddDiff)
+    assert diff.index == 8
+    assert len(diff.new_lines) == 1
+    assert diff.new_lines[0] == "Task 7"
+
+def test_dumb():
+    import subprocess
+    from pathlib import Path
+    path_lhs = Path("/tmp/lhs")
+    path_rhs = Path("/tmp/rhs")
+    if path_lhs.exists():
+        path_lhs.unlink()
+    if path_rhs.exists():
+        path_rhs.unlink()
+
+    diff_output = subprocess.run(
+        ["diff", "-e", str(path_lhs), str(path_rhs)], capture_output=True
+    ).stdout.decode()[
+        :-1
+    ]  # Trimming the last "\n"
+
+    print(interpret_raw_diff(diff_output))
 
 
 @pytest.fixture
