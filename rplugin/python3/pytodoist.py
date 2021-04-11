@@ -230,6 +230,8 @@ class ParsedBuffer:
     def compare_with(self, other):
         diff = Diff(other, self)
 
+        print("\n".join(diff.raw_diff))
+
         for diff_segment in diff:
             # We apply `-1` because the indices returned by the Diff engine are relative
             # to a text buffer which starts indexing at 1.
@@ -238,11 +240,31 @@ class ParsedBuffer:
             to_index = diff_segment.to_index - 1
             k = 0  # Used to track the "modified lines"
             for item in other[from_index:to_index]:
-                if diff_segment.action_type == "c":
-                    item.update(content=diff_segment[k])
-                    import ipdb; ipdb.set_trace()
-                    pass
-            k += 1
+                # `diff -e` can sometimes return a span of `from_index` and
+                # `to_index` that is actually longer than the number of provided
+                # `modified_lines` (see the docs of DiffSegment).
+                # This happens when lines have been deleted, but it's not explicitely
+                # said so by `diff`. Thus we need to be careful
+                if k < len(diff_segment.modified_lines):
+                    if diff_segment.action_type == "c":
+                        print(f"UPDATE:\n\t{item}\n\t{diff_segment[k]}")
+                        item.update(content=diff_segment[k])
+                    elif diff_segment.action_type == "d":
+                        print(f"DELETION:\n\t{item}")
+                        item.delete()
+                    elif diff_segment.action_type == "a":
+                        # TODO: not supported yet.
+                        pass
+
+                else:
+                    # From then on, `diff -e` doesn't provide any "modified_lines".
+                    # Implicitely, it is saying that the lines should be deleted.
+                    print(f"DELETION:\n\t{item}")
+                    item.delete()
+                k += 1
+
+        import ipdb; ipdb.set_trace()
+        pass
 
 
 
@@ -336,6 +358,10 @@ class Task:
         if "content" in kwargs.keys():
             self.content = kwargs["content"]
         return to_return
+
+    def delete(self):
+        self.data.delete()
+        self.content = "[Deleted]"
 
 
 class AddDiff:
@@ -482,7 +508,7 @@ class Diff:
 
         k = 0
         lines = self.raw_diff  # Shorter name for readibility.
-        while k <= len(lines):
+        while k < len(lines):
             matches = reg.match(lines[k])
 
             if matches.group("action_type") in ["a", "c"]:
@@ -543,7 +569,11 @@ class DiffSegment:
             self.to_index: int = self.from_index + 1
 
     def __getitem__(self, i: int):
-        return self.modified_lines[i]
+        try:
+            return self.modified_lines[i]
+        except:
+            import ipdb; ipdb.set_trace()
+            pass
 
     def __len__(self):
         return len(self.modified_lines)
