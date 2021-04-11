@@ -9,8 +9,6 @@ from dataclasses import dataclass
 import neovim
 import todoist
 
-# from .utils import AddDiff, get_diffs
-
 NULL = "null"
 SMART_TAG = True
 
@@ -352,81 +350,6 @@ class Task:
     def delete(self):
         self.data.delete()
         self.content = "[Deleted]"
-
-
-class AddDiff:
-    def __init__(self, index, new_lines):
-        self.index = index
-        self.new_lines = new_lines
-
-    def __repr__(self):
-        return f"AddDiff: {self.new_lines}"
-
-
-class ChangeDiff:
-    def __init__(self, index, new_lines):
-        self.index = index
-        self.new_lines = new_lines
-
-    def __repr__(self):
-        return f"ChangeDiff: {self.new_lines}"
-
-
-class DeleteDiff:
-    def __init__(self, index_range):
-        self.index_range = index_range
-
-
-def get_diffs(lhs, rhs):
-    raw_diff = get_raw_diff(lhs, rhs)
-    return interpret_raw_diff(raw_diff)
-
-
-def interpret_raw_diff(diff):
-    if diff == "":
-        return []
-
-    to_return = []
-    diff_lines = diff.split("\n")
-    k = 0
-    add_regex = re.compile(r"^(?P<start>\d+)a(?P<from>\d+)(,(?P<to>\d+))?$")
-    add_regex = re.compile(r"^(?P<index>\d+)a$")
-    change_regex = re.compile(r"^(?P<index>\d+)c$")
-    delete_regex = re.compile(r"^(?P<from>\d+)(,(?P<to>\d+))?d$")
-    while k < len(diff_lines):
-        line = diff_lines[k]
-        if "a" in line:
-            # 'Add'  mode.
-            index = int(add_regex.match(line).group("index"))
-            new_lines = []
-            k += 1
-            while diff_lines[k] != ".":
-                new_lines.append(diff_lines[k])
-                k += 1
-            to_return.append(AddDiff(index, new_lines))
-            k += 1
-        elif "d" in line:
-            # 'delete'  mode.
-            matches = delete_regex.match(line)
-            from_ = int(matches.group("from"))
-            to_ = matches.group("to")
-            if to_ is None:
-                to_ = from_
-            to_ = int(to_)
-            index_range = range(from_, to_ + 1)
-            to_return.append(DeleteDiff(index_range))
-            k += 1
-        elif "c" in line:
-            index = int(change_regex.match(line).group("index"))
-            new_lines = []
-            k += 1
-            while diff_lines[k] != ".":
-                new_lines.append(diff_lines[k])
-                k += 1
-            to_return.append(ChangeDiff(index, new_lines))
-            k += 1
-
-    return to_return
 
 
 class ProjectUnderline:
