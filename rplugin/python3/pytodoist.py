@@ -1,7 +1,8 @@
+from abc import abstractmethod
 import os
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 from copy import copy, deepcopy
 from dataclasses import dataclass
 
@@ -108,7 +109,7 @@ class Plugin(object):
                 self.nvim.current.buffer.append(item)
 
         self.nvim.api.command("w!")  # Cancel the "modified" state of the buffer.
-        self.buffer_at_init = ParsedBuffer(self._get_buffer_content())
+        self.buffer_at_init = ParsedBuffer(self._get_buffer_content(), self.todoist)
 
         # self._refresh_colors()
 
@@ -135,10 +136,50 @@ class Plugin(object):
         self.nvim.api.echo([[message, ""]], True, {})
 
 
+class TodoistInterface:
+    def __init__(self, todoist_api: todoist.api.TodoistAPI):
+        self.api = todoist_api
+        self.tasks = None
+        self.projects = None
+
+    def sync(self):
+        self.api.sync()
+        self.tasks = [Task(data=item) for item in self.api.state["items"]]
+        self.projects = [Project(data=item) for item in self.api.state["projects"]]
+
+    def get_project_by_name(self, project_name):
+        for project in self.projects:
+            if project_name == project.name:
+                return project
+        return None
+
+    def get_task_by_content(self, content):
+        for task in self.tasks:
+            if content == task.content:
+                return task
+        return None
+
+    def __iter__(self):
+        for project in self.projects:
+            yield project
+            yield ProjectUnderline(project_name=project.name)
+            for task in self.tasks:
+                if task.isin(project) and task.isvalid():
+                    yield task
+            yield ProjectSeparator()
+
+    def add_task(self, *args, **kwargs):
+        return self.api.items.add(*args, **kwargs)
+
+
 class ParsedBuffer:
-    def __init__(self, lines: List[str]):
+    def __init__(self, lines: List[str], todoist: TodoistInterface = None):
         self._raw_lines = lines
-        self.lines = self.parse_lines()
+        self.todoist = todoist
+
+        self.items = self.parse_lines()
+        if self.todoist is not None:
+            self.fill_items_with_data()
 
     # TODO: this function is not stateful.
     def parse_lines(self):
@@ -168,26 +209,41 @@ class ParsedBuffer:
             k += 1
         return items
 
-
-class TodoistInterface:
-    def __init__(self, todoist_api: todoist.api.TodoistAPI):
-        self.api = todoist_api
-        self.tasks = None
-        self.projects = None
-
-    def sync(self):
-        self.api.sync()
-        self.tasks = [Task(data=item) for item in self.api.state["items"]]
-        self.projects = [Project(data=item) for item in self.api.state["projects"]]
+    def fill_items_with_data(self):
+        for i, item in enumerate(self.items):
+            if isinstance(item, Project):
+                project = self.todoist.get_project_by_name(item.name)
+                if project is not None:
+                    self.items[i] = project
+            elif isinstance(item, Task):
+                task = self.todoist.get_task_by_content(item.content)
+                if task is not None:
+                    self.items[i] = task
 
     def __iter__(self):
-        for project in self.projects:
-            yield project
-            yield ProjectUnderline(project_name=project.name)
-            for task in self.tasks:
-                if task.isin(project) and task.isvalid():
-                    yield task
-            yield ProjectSeparator()
+        yield from self.items
+
+    def __getitem__(self, i):
+        return self.items[i]
+
+    # I have to find another name for this.
+    def compare_with(self, other):
+        diff = Diff(other, self)
+
+        for diff_segment in diff:
+            # We apply `-1` because the indices returned by the Diff engine are relative
+            # to a text buffer which starts indexing at 1.
+            # The ParsedBuffer, however, starts indexing at 0.
+            from_index = diff_segment.from_index - 1
+            to_index = diff_segment.to_index - 1
+            k = 0  # Used to track the "modified lines"
+            for item in other[from_index:to_index]:
+                if diff_segment.action_type == "c":
+                    item.update(content=diff_segment[k])
+                    import ipdb; ipdb.set_trace()
+                    pass
+            k += 1
+
 
 
 class Project:
@@ -217,7 +273,7 @@ class Project:
         return hash(self.__repr__())
 
     def __eq__(self, rhs):
-        if self.id != "[Not synced]" and rhs.id != ["Not synced"]:
+        if self.id != "[Not synced]" and rhs.id != "[Not synced]":
             return self.id == rhs.id
         return self.__repr__() == rhs.__repr__()
 
@@ -257,7 +313,7 @@ class Task:
         return hash(self.__repr__())
 
     def __eq__(self, rhs):
-        if self.id != "[Not synced]" and rhs.id != ["Not synced"]:
+        if self.id != "[Not synced]" and rhs.id != "[Not synced]":
             return self.id == rhs.id
         return self.__repr__() == rhs.__repr__()
 
@@ -274,6 +330,12 @@ class Task:
             or self.data["in_history"]
             or self.data["date_completed"] is not None
         )
+
+    def update(self, *args, **kwargs):
+        to_return = self.data.update(*args, **kwargs)
+        if "content" in kwargs.keys():
+            self.content = kwargs["content"]
+        return to_return
 
 
 class AddDiff:
@@ -302,29 +364,6 @@ class DeleteDiff:
 def get_diffs(lhs, rhs):
     raw_diff = get_raw_diff(lhs, rhs)
     return interpret_raw_diff(raw_diff)
-
-
-def get_raw_diff(lhs, rhs):
-    if lhs is None or rhs is None:
-        return ""
-    # TODO: that's dirty. Ideally we should pipe directly to `diff`.
-    path_lhs = Path("/tmp/lhs")
-    if path_lhs.exists():
-        path_lhs.unlink()
-    path_lhs.write_text(lhs)
-
-    path_rhs = Path("/tmp/rhs")
-    if path_rhs.exists():
-        path_rhs.unlink()
-    path_rhs.write_text(rhs)
-
-    diff_output = subprocess.run(
-        ["diff", "-e", str(path_lhs), str(path_rhs)], capture_output=True
-    ).stdout.decode()[
-        :-1
-    ]  # Trimming the last "\n"
-
-    return diff_output
 
 
 def interpret_raw_diff(diff):
@@ -418,3 +457,94 @@ BG_COLORS_ID_TO_HEX = {
     48: "#b8b8b8",
     49: "#ccac93",
 }
+
+TodoistObjects = Union[Task, Project, ProjectUnderline, ProjectSeparator]
+
+
+class Diff:
+    def __init__(
+        self,
+        lhs: List[Union[str, TodoistObjects, ParsedBuffer]],
+        rhs: List[Union[str, TodoistObjects, ParsedBuffer]],
+    ):
+        self.lhs = "\n".join([str(item) for item in lhs])
+        self.rhs = "\n".join([str(item) for item in rhs])
+
+        self.raw_diff = self.get_raw_diff(self.lhs, self.rhs)
+
+    def __iter__(self):
+        # We build a regex capable of registering all possible commands from `ed`
+        # (as given by `diff`).
+        # Some examples: 90a - 62,67d - 150,160c
+        reg = re.compile(
+            f"^(?P<from_index>\d+)(,(?P<to_index>\d+))?(?P<action_type>a|c|d)$"
+        )
+
+        k = 0
+        lines = self.raw_diff  # Shorter name for readibility.
+        while k <= len(lines):
+            matches = reg.match(lines[k])
+
+            if matches.group("action_type") in ["a", "c"]:
+                modified_lines = []
+                while lines[k] != ".":
+                    k += 1
+                    modified_lines.append(lines[k])
+                modified_lines = modified_lines[:-1]  # Deleting the last "."
+                yield DiffSegment(
+                    matches.group("action_type"),
+                    matches.group("from_index"),
+                    matches.group("to_index"),
+                    modified_lines,
+                )
+
+            elif matches.group("action_type") == "d":
+                yield DiffSegment(
+                    matches.group("action_type"),
+                    matches.group("from_index"),
+                    matches.group("to_index"),
+                    [],
+                )
+
+            k += 1
+
+    @abstractmethod
+    def get_raw_diff(self, lhs: str, rhs: str):
+        # TODO: that's dirty. Ideally we should pipe directly to `diff`.
+        path_lhs = Path("/tmp/lhs")
+        if path_lhs.exists():
+            path_lhs.unlink()
+        path_lhs.write_text(lhs)
+
+        path_rhs = Path("/tmp/rhs")
+        if path_rhs.exists():
+            path_rhs.unlink()
+        path_rhs.write_text(rhs)
+
+        diff_output = subprocess.run(
+            ["diff", "-e", str(path_lhs), str(path_rhs)], capture_output=True
+        )
+        diff_output = diff_output.stdout.decode()[:-1]  # Trimming the last "\n"
+
+        return diff_output.split("\n")
+
+@dataclass
+class DiffSegment:
+    action_type: str
+    from_index: Union[str, int]
+    to_index: Optional[Union[str, int]]
+    modified_lines: List[str]
+
+    def __post_init__(self):
+        self.from_index: int = int(self.from_index)
+        if self.to_index is not None:
+            self.to_index: int = int(self.to_index) + 1
+        else:
+            self.to_index: int = self.from_index + 1
+
+    def __getitem__(self, i: int):
+        return self.modified_lines[i]
+
+    def __len__(self):
+        return len(self.modified_lines)
+
