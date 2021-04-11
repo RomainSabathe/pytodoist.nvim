@@ -228,7 +228,7 @@ class ParsedBuffer:
 
     # I have to find another name for this.
     def compare_with(self, other):
-        diff = Diff(other, self)
+        diff = Diff(self, other)
 
         print("\n".join(diff.raw_diff))
 
@@ -238,34 +238,24 @@ class ParsedBuffer:
             # The ParsedBuffer, however, starts indexing at 0.
             from_index = diff_segment.from_index - 1
             to_index = diff_segment.to_index - 1
-            k = 0  # Used to track the "modified lines"
-            for item in other[from_index:to_index]:
-                # `diff -e` can sometimes return a span of `from_index` and
-                # `to_index` that is actually longer than the number of provided
-                # `modified_lines` (see the docs of DiffSegment).
-                # This happens when lines have been deleted, but it's not explicitely
-                # said so by `diff`. Thus we need to be careful
-                if k < len(diff_segment.modified_lines):
-                    if diff_segment.action_type == "c":
-                        print(f"UPDATE:\n\t{item}\n\t{diff_segment[k]}")
-                        item.update(content=diff_segment[k])
-                    elif diff_segment.action_type == "d":
-                        print(f"DELETION:\n\t{item}")
-                        item.delete()
-                    elif diff_segment.action_type == "a":
-                        # TODO: not supported yet.
-                        pass
+            modification_span = max(to_index - from_index, len(diff_segment))
 
+            befores = self[from_index:to_index]
+            befores.extend([None for _ in range(len(befores), modification_span)])
+
+            afters = diff_segment.modified_lines
+            afters.extend([None for _ in range(len(afters), modification_span)])
+
+            for (item_before, item_after) in zip(befores, afters):
+                if item_before is None or diff_segment.action_type == "a":
+                    print(f"CREATION:\n\t{item_after}")
+                    self.todoist.add_task(content=item_after)
+                elif item_after is None or diff_segment.action_type == "d":
+                    print(f"DELETION:\n\t{item_before}")
+                    item_before.delete()
                 else:
-                    # From then on, `diff -e` doesn't provide any "modified_lines".
-                    # Implicitely, it is saying that the lines should be deleted.
-                    print(f"DELETION:\n\t{item}")
-                    item.delete()
-                k += 1
-
-        import ipdb; ipdb.set_trace()
-        pass
-
+                    print(f"UPDATE:\n\t{item_before}\n\t{item_after}")
+                    item_before.update(content=item_after)
 
 
 class Project:
@@ -554,6 +544,7 @@ class Diff:
 
         return diff_output.split("\n")
 
+
 @dataclass
 class DiffSegment:
     action_type: str
@@ -572,9 +563,13 @@ class DiffSegment:
         try:
             return self.modified_lines[i]
         except:
-            import ipdb; ipdb.set_trace()
+            import ipdb
+
+            ipdb.set_trace()
             pass
 
     def __len__(self):
         return len(self.modified_lines)
 
+    def __iter__(self):
+        yield from self.modified_lines

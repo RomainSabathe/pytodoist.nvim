@@ -18,7 +18,7 @@ def test_diff(todoist_api):
     lines_after = Path("/tmp/todoist_after").read_text().split("\n")
     buffer_after = ParsedBuffer(lines_after)
 
-    buffer_after.compare_with(buffer_before)
+    buffer_before.compare_with(buffer_after)
     import ipdb; ipdb.set_trace()
     pass
 
