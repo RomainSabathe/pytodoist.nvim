@@ -19,8 +19,10 @@ def test_diff(todoist_api):
     buffer_after = ParsedBuffer(lines_after)
 
     buffer_before.compare_with(buffer_after)
-    import ipdb; ipdb.set_trace()
-    pass
+
+def test_interface(todoist_api):
+    for item in todoist_api:
+        pass
 
 @pytest.fixture
 def todoist_api():

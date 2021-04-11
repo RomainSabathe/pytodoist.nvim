@@ -55,8 +55,10 @@ class Plugin(object):
             # and saving.
             return
 
-        self.buffer_at_saved = ParsedBuffer(self._get_buffer_content())
-        self.echo("About to write.")
+        buffer_at_save = ParsedBuffer(self._get_buffer_content())
+        self.buffer_at_init.compare_with(buffer_at_save)
+        self.todoist.commit()
+        # self.load_tasks(None)
 
     @neovim.autocmd("InsertLeave", pattern="todoist", sync=True)
     def register_updated_line(self):
@@ -167,7 +169,16 @@ class TodoistInterface:
             yield ProjectSeparator()
 
     def add_task(self, *args, **kwargs):
+        if "is_deleted" not in kwargs.keys():
+            kwargs["is_deleted"] = False
+        if "in_history" not in kwargs.keys():
+            kwargs["in_history"] = False
+        if "date_completed" not in kwargs.keys():
+            kwargs["date_completed"] = None
         return self.api.items.add(*args, **kwargs)
+
+    def commit(self):
+        return self.api.commit()
 
 
 class ParsedBuffer:
