@@ -34,18 +34,10 @@ class Plugin(object):
     @neovim.autocmd("InsertEnter", pattern="todoist", sync=False)
     def register_current_line(self):
         pass
-        # line = self.nvim.current.line.strip()
-        # self.current_task = self.tasks[line] if line else None
-
-        # self.last_buffer = copy(self._get_buffer_content())
 
     @neovim.autocmd("CursorMoved", pattern="todoist", sync=True)
     def cursor_moved(self):
         pass
-        # if self.last_buffer is None:
-        #     self.last_buffer = copy(self._get_buffer_content())
-        # # self.nvim.command(f"echom 'hello'")
-        # self.register_updated_line()
 
     @neovim.autocmd("BufWritePre", pattern="todoist", sync=True)
     def save_buffer(self):
@@ -58,44 +50,13 @@ class Plugin(object):
         buffer_at_save = ParsedBuffer(self._get_buffer_content())
         self.buffer_at_init.compare_with(buffer_at_save)
         self.todoist.commit()
+        self.todoist.sync()
+        self.buffer_at_init = ParsedBuffer(self._get_buffer_content(), self.todoist)
         # self.load_tasks(None)
 
     @neovim.autocmd("InsertLeave", pattern="todoist", sync=True)
     def register_updated_line(self):
         pass
-        # new_buffer = copy(self._get_buffer_content())
-        # diffs = get_diffs(self.last_buffer, new_buffer)
-        # for diff in diffs:
-        #     if isinstance(diff, AddDiff):
-        #         index = diff.index - 1
-        #         associated_project = self.world.line_to_project(index)
-        #         for line in diff.new_lines:
-        #             self._create_task(line, project=associated_project)
-        #     elif isinstance(diff, ChangeDiff):
-        #         index = diff.index - 1
-        #         new_line = diff.new_lines[0]
-        #         item = self.world[index]
-        #         if isinstance(item, TaskInfo):
-        #             self.todoist.items.update(item.id, content=new_line)
-        #         elif isinstance(item, (ProjectSeparator, ProjectUnderline)):
-        #             associated_project = self.world.line_to_project(index)
-        #             self._create_task(new_line, project=associated_project)
-        #     elif isinstance(diff, DeleteDiff):
-        #         for index in diff.index_range:
-        #             index = index - 1
-        #             item = self.world[index]
-        #             self.nvim.command(f"""echom 'Will be deleted: {str(item)}'""")
-        #             if isinstance(item, TaskInfo):
-        #                 self.todoist.items.delete(item.id)
-        #             elif isinstance(item, (ProjectSeparator, ProjectUnderline)):
-        #                 pass
-        #             elif isinstance(item, Project):
-        #                 pass
-
-        # if len(diffs) > 0:
-        #     self.todoist.commit()
-        #     self.world = World(self.todoist)
-        #     self.last_buffer = new_buffer
 
     @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
@@ -110,7 +71,6 @@ class Plugin(object):
 
         self.nvim.api.command("w!")  # Cancel the "modified" state of the buffer.
         self.buffer_at_init = ParsedBuffer(self._get_buffer_content(), self.todoist)
-
         # self._refresh_colors()
 
     def _clear_buffer(self):

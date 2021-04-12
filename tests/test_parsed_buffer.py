@@ -13,9 +13,11 @@ def test_init():
 def test_diff(todoist_api):
     from pathlib import Path
     lines_before = Path("/tmp/todoist_before").read_text().split("\n")
+    lines_before = Path("/tmp/lhs").read_text().split("\n")
     buffer_before = ParsedBuffer(lines_before, todoist_api)
 
     lines_after = Path("/tmp/todoist_after").read_text().split("\n")
+    lines_after = Path("/tmp/rhs").read_text().split("\n")
     buffer_after = ParsedBuffer(lines_after)
 
     buffer_before.compare_with(buffer_after)
