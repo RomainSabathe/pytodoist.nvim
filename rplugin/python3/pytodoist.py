@@ -233,7 +233,10 @@ class ParsedBuffer:
                     item_before.delete()
                 else:
                     print(f"UPDATE:\n\t{item_before}\n\t{item_after}")
-                    item_before.update(content=item_after)
+                    if isinstance(item_before, Task):
+                        item_before.update(content=item_after)
+                    elif isinstance(item_before, Project):
+                        item_before.update(name=item_after)
 
 
 class Project:
@@ -266,6 +269,12 @@ class Project:
         if self.id != "[Not synced]" and rhs.id != "[Not synced]":
             return self.id == rhs.id
         return self.__repr__() == rhs.__repr__()
+
+    def update(self, *args, **kwargs):
+        to_return = self.data.update(*args, **kwargs)
+        if "name" in kwargs.keys():
+            self.name = kwargs["name"]
+        return to_return
 
 
 class Task:
@@ -395,6 +404,7 @@ class Diff:
         if self.raw_diff == [""]:
             # Case where there are no differences.
             return
+
         # We build a regex capable of registering all possible commands from `ed`
         # (as given by `diff`).
         # Some examples: 90a - 62,67d - 150,160c
