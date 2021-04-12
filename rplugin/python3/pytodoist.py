@@ -392,6 +392,9 @@ class Diff:
         self.raw_diff = self.get_raw_diff(self.lhs, self.rhs)
 
     def __iter__(self):
+        if self.raw_diff == [""]:
+            # Case where there are no differences.
+            return
         # We build a regex capable of registering all possible commands from `ed`
         # (as given by `diff`).
         # Some examples: 90a - 62,67d - 150,160c
