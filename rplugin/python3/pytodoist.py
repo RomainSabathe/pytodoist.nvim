@@ -26,7 +26,7 @@ class Plugin(object):
         self.todoist = TodoistInterface(
             todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY"))
         )
-        self.buffer_at_init = None
+        self.parsed_buffer = None
 
     def _get_buffer_content(self) -> List[str]:
         return self.nvim.current.buffer[:]
@@ -41,22 +41,46 @@ class Plugin(object):
 
     @neovim.autocmd("BufWritePre", pattern="todoist", sync=True)
     def save_buffer(self):
-        if self.buffer_at_init is None:
+        if self.parsed_buffer is None:
             # This is triggered at the first initialization of `_load_tasks`.
             # If we don't return early, we'd be stuck in an endless loop of syncing
             # and saving.
             return
 
-        buffer_at_save = ParsedBuffer(self._get_buffer_content())
-        self.buffer_at_init.compare_with(buffer_at_save)
+        updated_buffer = ParsedBuffer(self._get_buffer_content())
+        self.parsed_buffer.compare_with(updated_buffer)
         self.todoist.commit()
         self.todoist.sync()
-        self.buffer_at_init = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         # self.load_tasks(None)
 
     @neovim.autocmd("InsertLeave", pattern="todoist", sync=True)
     def register_updated_line(self):
         pass
+
+    @neovim.function("MoveTask", sync=True)
+    def move_task(self, args):
+        self.nvim.api.command("call inputsave()")
+        self.nvim.api.command(f"let project_name = input('Project: ')")
+        self.nvim.api.command("call inputrestore()")
+        project_name = self.nvim.api.eval("project_name")
+        if project_name == "":
+            return
+
+        line_index = self._get_current_line_index()
+        item = self.parsed_buffer[line_index - 1]
+        project = self.todoist.get_project_by_name(project_name)
+
+        item.move(project_id=project.id)
+        # Updating the buffer. First we delete the current line, then we paste it
+        # in the appropriate project.
+        self.nvim.api.command(f"{line_index}d")
+        for i, item in enumerate(self.parsed_buffer):
+            if isinstance(item, Project) and item.id == project.id:
+                # The project line has index `i + 1`.
+                # We paste the line at `i + 2` (after the ProjectUnderline).
+                # TODO
+                break
 
     @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
@@ -70,7 +94,7 @@ class Plugin(object):
                 self.nvim.current.buffer.append(item)
 
         self.nvim.api.command("w!")  # Cancel the "modified" state of the buffer.
-        self.buffer_at_init = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         # self._refresh_colors()
 
     def _clear_buffer(self):
@@ -93,7 +117,7 @@ class Plugin(object):
 
     def echo(self, message: str):
         # Type `:help nvim_echo` for more info about the args.
-        self.nvim.api.echo([[message, ""]], True, {})
+        self.nvim.api.echo([[str(message), ""]], True, {})
 
 
 class TodoistInterface:
@@ -109,7 +133,7 @@ class TodoistInterface:
 
     def get_project_by_name(self, project_name):
         for project in self.projects:
-            if project_name == project.name:
+            if project_name.lower() == project.name.lower():
                 return project
         return None
 
@@ -339,6 +363,9 @@ class Task:
     def delete(self):
         self.data.delete()
         self.content = "[Deleted]"
+
+    def move(self, *args, **kwargs):
+        return self.data.move(*args, **kwargs)
 
 
 class ProjectUnderline:
