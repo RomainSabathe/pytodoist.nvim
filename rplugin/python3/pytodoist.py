@@ -129,6 +129,7 @@ class TodoistInterface:
             yield ProjectSeparator()
 
     def add_task(self, *args, **kwargs):
+        # We populate this fields because the `is_valid` function will use it.
         if "is_deleted" not in kwargs.keys():
             kwargs["is_deleted"] = False
         if "in_history" not in kwargs.keys():
@@ -209,6 +210,14 @@ class ParsedBuffer:
             to_index = diff_segment.to_index - 1
             modification_span = max(to_index - from_index, len(diff_segment))
 
+            # A diff segment is composed of 3 things:
+            # 1. The type of action (change, add, delete).
+            # 2. The indices of lines that are involved.
+            # 3. The actual modified lines.
+            # Sometimes, items 2. and 3. don't match, and we have a larger span than
+            # there are of "modified lines" or vice-versa.
+            # To easy the comparison, we make sure that they match, by filling with
+            # potential None values.
             befores = self[from_index:to_index]
             befores.extend([None for _ in range(len(befores), modification_span)])
 
