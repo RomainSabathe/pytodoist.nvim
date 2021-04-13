@@ -168,103 +168,6 @@ class TodoistInterface:
         return self.api.commit()
 
 
-class ParsedBuffer:
-    def __init__(self, lines: List[str], todoist: TodoistInterface = None):
-        self._raw_lines = lines
-        self.todoist = todoist
-
-        self.items = self.parse_lines()
-        if self.todoist is not None:
-            self.fill_items_with_data()
-
-    # TODO: this function is not stateful.
-    def parse_lines(self):
-        items = []
-
-        k = 0
-        while k < len(self._raw_lines):
-            line = self._raw_lines[k]
-
-            # Look ahead: checking if the current line is actually a project.
-            potential_project_name = line
-            potential_underline = ProjectUnderline(potential_project_name)
-            if (
-                potential_project_name != ""
-                and str(potential_underline) == self._raw_lines[k + 1]
-            ):
-                # We are indeed scanning a project name. We register this info
-                # and move on.
-                items.append(Project(name=potential_project_name))
-                items.append(potential_underline)
-                k += 2
-                continue
-
-            # The remaining possibilities are: a proper task or a ProjectSeparator.
-            item = Task(content=line) if line != "" else ProjectSeparator()
-            items.append(item)
-            k += 1
-        return items
-
-    def fill_items_with_data(self):
-        for i, item in enumerate(self.items):
-            if isinstance(item, Project):
-                project = self.todoist.get_project_by_name(item.name)
-                if project is not None:
-                    self.items[i] = project
-            elif isinstance(item, Task):
-                task = self.todoist.get_task_by_content(item.content)
-                if task is not None:
-                    self.items[i] = task
-
-    def __iter__(self):
-        yield from self.items
-
-    def __getitem__(self, i):
-        return self.items[i]
-
-    # I have to find another name for this.
-    def compare_with(self, other):
-        diff = Diff(self, other)
-
-        print("\n".join(diff.raw_diff))
-
-        for diff_segment in diff:
-            # We apply `-1` because the indices returned by the Diff engine are relative
-            # to a text buffer which starts indexing at 1.
-            # The ParsedBuffer, however, starts indexing at 0.
-            from_index = diff_segment.from_index - 1
-            to_index = diff_segment.to_index - 1
-            modification_span = max(to_index - from_index, len(diff_segment))
-
-            # A diff segment is composed of 3 things:
-            # 1. The type of action (change, add, delete).
-            # 2. The indices of lines that are involved.
-            # 3. The actual modified lines.
-            # Sometimes, items 2. and 3. don't match, and we have a larger span than
-            # there are of "modified lines" or vice-versa.
-            # To easy the comparison, we make sure that they match, by filling with
-            # potential None values.
-            befores = self[from_index:to_index]
-            befores.extend([None for _ in range(len(befores), modification_span)])
-
-            afters = diff_segment.modified_lines
-            afters.extend([None for _ in range(len(afters), modification_span)])
-
-            for (item_before, item_after) in zip(befores, afters):
-                if item_before is None or diff_segment.action_type == "a":
-                    print(f"CREATION:\n\t{item_after}")
-                    self.todoist.add_task(content=item_after)
-                elif item_after is None or diff_segment.action_type == "d":
-                    print(f"DELETION:\n\t{item_before}")
-                    item_before.delete()
-                else:
-                    print(f"UPDATE:\n\t{item_before}\n\t{item_after}")
-                    if isinstance(item_before, Task):
-                        item_before.update(content=item_after)
-                    elif isinstance(item_before, Project):
-                        item_before.update(name=item_after)
-
-
 class Project:
     def __init__(self, name: str = None, data: todoist.models.Project = None):
         assert name is not None or data is not None
@@ -396,6 +299,111 @@ class ProjectSeparator:
 
     def __str__(self):
         return ""
+
+
+class ParsedBuffer:
+    def __init__(self, lines: List[str], todoist: TodoistInterface = None):
+        self._raw_lines = lines
+        self.todoist = todoist
+
+        self.items = self.parse_lines()
+        if self.todoist is not None:
+            self.fill_items_with_data()
+
+    # TODO: this function is not stateful.
+    def parse_lines(self):
+        items = []
+
+        k = 0
+        while k < len(self._raw_lines):
+            line = self._raw_lines[k]
+
+            # Look ahead: checking if the current line is actually a project.
+            potential_project_name = line
+            potential_underline = ProjectUnderline(potential_project_name)
+            if (
+                potential_project_name != ""
+                and str(potential_underline) == self._raw_lines[k + 1]
+            ):
+                # We are indeed scanning a project name. We register this info
+                # and move on.
+                items.append(Project(name=potential_project_name))
+                items.append(potential_underline)
+                k += 2
+                continue
+
+            # The remaining possibilities are: a proper task or a ProjectSeparator.
+            item = Task(content=line) if line != "" else ProjectSeparator()
+            items.append(item)
+            k += 1
+        return items
+
+    def fill_items_with_data(self):
+        for i, item in enumerate(self.items):
+            if isinstance(item, Project):
+                project = self.todoist.get_project_by_name(item.name)
+                if project is not None:
+                    self.items[i] = project
+            elif isinstance(item, Task):
+                task = self.todoist.get_task_by_content(item.content)
+                if task is not None:
+                    self.items[i] = task
+
+    def __iter__(self):
+        yield from self.items
+
+    def __getitem__(self, i):
+        return self.items[i]
+
+    def _get_project_at_line(self, i: int) -> Project:
+        # We take the first project that we encounter by "moving up" in the document.
+        for item in self[:i][::-1]:
+            if isinstance(item, Project):
+                return item
+        raise Exception("Couldn't find project.")
+
+    # I have to find another name for this.
+    def compare_with(self, other):
+        diff = Diff(self, other)
+
+        print("\n".join(diff.raw_diff))
+
+        for diff_segment in diff:
+            # We apply `-1` because the indices returned by the Diff engine are relative
+            # to a text buffer which starts indexing at 1.
+            # The ParsedBuffer, however, starts indexing at 0.
+            from_index = diff_segment.from_index - 1
+            to_index = diff_segment.to_index - 1
+            modification_span = max(to_index - from_index, len(diff_segment))
+
+            # A diff segment is composed of 3 things:
+            # 1. The type of action (change, add, delete).
+            # 2. The indices of lines that are involved.
+            # 3. The actual modified lines.
+            # Sometimes, items 2. and 3. don't match, and we have a larger span than
+            # there are of "modified lines" or vice-versa.
+            # To easy the comparison, we make sure that they match, by filling with
+            # potential None values.
+            befores = self[from_index:to_index]
+            befores.extend([None for _ in range(len(befores), modification_span)])
+
+            afters = diff_segment.modified_lines
+            afters.extend([None for _ in range(len(afters), modification_span)])
+
+            for i, (item_before, item_after) in enumerate(zip(befores, afters)):
+                if item_before is None or diff_segment.action_type == "a":
+                    print(f"CREATION:\n\t{item_after}")
+                    project = self._get_project_at_line(from_index + i)
+                    self.todoist.add_task(content=item_after, project_id=project.id)
+                elif item_after is None or diff_segment.action_type == "d":
+                    print(f"DELETION:\n\t{item_before}")
+                    item_before.delete()
+                else:
+                    print(f"UPDATE:\n\t{item_before}\n\t{item_after}")
+                    if isinstance(item_before, Task):
+                        item_before.update(content=item_after)
+                    elif isinstance(item_before, Project):
+                        item_before.update(name=item_after)
 
 
 BG_COLORS_ID_TO_HEX = {
