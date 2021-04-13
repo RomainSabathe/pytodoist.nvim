@@ -58,8 +58,8 @@ class Plugin(object):
     def register_updated_line(self):
         pass
 
-    @neovim.function("MoveTask", sync=True)
-    def move_task(self, args):
+    @neovim.function("MoveTask", sync=True, range=True)
+    def move_task(self, args, _range):
         self.nvim.api.command("call inputsave()")
         self.nvim.api.command(f"let project_name = input('Project: ')")
         self.nvim.api.command("call inputrestore()")
@@ -70,15 +70,13 @@ class Plugin(object):
         self.nvim.api.command("let position = getcurpos()")
         buf_index, line_index, col_index, offset, _ = self.nvim.api.eval("position")
 
-        item = self.parsed_buffer[line_index - 1]
         project = self.todoist.get_project_by_name(project_name)
 
         # TODO: still unsure if we want to do this...
+        # item = self.parsed_buffer[line_index - 1]
         # item.move(project_id=project.id)
 
-        # Updating the buffer. First we delete the current line, then we paste it
-        # in the appropriate project.
-        self.nvim.api.command(f"{line_index}d")
+        # Finding where to paste the tasks.
         for i, item in enumerate(self.parsed_buffer):
             if isinstance(item, Project) and item.id == project.id:
                 # We found the project in which to place the task. We could place the
@@ -91,8 +89,10 @@ class Plugin(object):
                 # We finally found where to place the task.
                 break
 
-        # We need to paste the line at position `i + j - 1`.
-        self.nvim.api.command(f"{i+j-1}pu")
+        # We need to paste the line(s) at position `i + j - 1`.
+        # For each line, we delete and paste. We go backwards to preserve the ordering.
+        self.nvim.api.command(f"{_range[0]},{_range[1]}d")
+        self.nvim.api.command(f"{i+j}pu")
         self.nvim.api.command(
             f"call setpos('.', [{buf_index}, {line_index}, {col_index}, {offset}])"
         )

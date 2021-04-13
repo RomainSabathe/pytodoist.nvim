@@ -7,6 +7,7 @@
 "nnoremap <buffer><silent> dd :call DeleteTask()<CR>
 nnoremap <silent> <leader>T :call LoadTasks()<CR>
 :autocmd FileType todoist nnoremap <buffer><silent> m :call MoveTask()<CR>
+:autocmd FileType todoist vnoremap <buffer><silent> m :call MoveTask()<CR>
 ":autocmd FileType todoist nnoremap <buffer><silent> dd :call DeleteTask()<CR>
 ":autocmd FileType todoist nnoremap <buffer><silent> u :call Undo()<CR>
 ":autocmd FileType todoist nnoremap <buffer><silent> <c-r> :call Redo()<CR>
