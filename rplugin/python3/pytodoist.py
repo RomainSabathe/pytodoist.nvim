@@ -338,6 +338,7 @@ class ParsedBuffer:
             potential_underline = ProjectUnderline(potential_project_name)
             if (
                 potential_project_name != ""
+                and k + 1 < len(self._raw_lines)
                 and str(potential_underline) == self._raw_lines[k + 1]
             ):
                 # We are indeed scanning a project name. We register this info
@@ -409,14 +410,12 @@ class ParsedBuffer:
 
             for i, (item_before, item_after) in enumerate(zip(befores, afters)):
                 if item_before is None or diff_segment.action_type == "a":
-                    print(f"CREATION:\n\t{item_after}")
                     project = self._get_project_at_line(from_index + i)
                     self.todoist.add_task(content=item_after, project_id=project.id)
                 elif item_after is None or diff_segment.action_type == "d":
-                    print(f"DELETION:\n\t{item_before}")
-                    item_before.delete()
+                    if isinstance(item_before, Task):
+                        item_before.delete()
                 else:
-                    print(f"UPDATE:\n\t{item_before}\n\t{item_after}")
                     if isinstance(item_before, Task):
                         item_before.update(content=item_after)
                     elif isinstance(item_before, Project):
