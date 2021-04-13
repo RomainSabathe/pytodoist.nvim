@@ -147,19 +147,21 @@ class TodoistInterface:
         for project in self.projects:
             yield project
             yield ProjectUnderline(project_name=project.name)
-            for task in self.tasks:
+            for task in sorted(self.tasks, key=lambda task: task.child_order):
                 if task.isin(project) and task.isvalid():
                     yield task
             yield ProjectSeparator()
 
     def add_task(self, *args, **kwargs):
-        # We populate this fields because the `is_valid` function will use it.
+        # We populate this fields because the `isvalid` function will use it.
         if "is_deleted" not in kwargs.keys():
             kwargs["is_deleted"] = False
         if "in_history" not in kwargs.keys():
             kwargs["in_history"] = False
         if "date_completed" not in kwargs.keys():
             kwargs["date_completed"] = None
+        if "child_order" not in kwargs.keys():
+            kwargs["child_order"] = 99  # TODO: dirty.
         return self.api.items.add(*args, **kwargs)
 
     def commit(self):
@@ -316,6 +318,12 @@ class Task:
         if self.data is not None:
             return self.data["id"]
         return "[Not synced]"
+
+    @property
+    def child_order(self):
+        if self.data is not None:
+            return self.data["child_order"]
+        return 1
 
     def __repr__(self) -> str:
         short_content = (
