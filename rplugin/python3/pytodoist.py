@@ -67,20 +67,35 @@ class Plugin(object):
         if project_name == "":
             return
 
-        line_index = self._get_current_line_index()
+        self.nvim.api.command("let position = getcurpos()")
+        buf_index, line_index, col_index, offset, _ = self.nvim.api.eval("position")
+
         item = self.parsed_buffer[line_index - 1]
         project = self.todoist.get_project_by_name(project_name)
 
-        item.move(project_id=project.id)
+        # TODO: still unsure if we want to do this...
+        # item.move(project_id=project.id)
+
         # Updating the buffer. First we delete the current line, then we paste it
         # in the appropriate project.
         self.nvim.api.command(f"{line_index}d")
         for i, item in enumerate(self.parsed_buffer):
             if isinstance(item, Project) and item.id == project.id:
-                # The project line has index `i + 1`.
-                # We paste the line at `i + 2` (after the ProjectUnderline).
-                # TODO
+                # We found the project in which to place the task. We could place the
+                # task right here. However we choose to place the task at the bottom of
+                # the task list by default.
+                # We need to iterate one last time to find it.
                 break
+        for j, item in enumerate(self.parsed_buffer[i:]):
+            if isinstance(item, ProjectSeparator):
+                # We finally found where to place the task.
+                break
+
+        # We need to paste the line at position `i + j - 1`.
+        self.nvim.api.command(f"{i+j-1}pu")
+        self.nvim.api.command(
+            f"call setpos('.', [{buf_index}, {line_index}, {col_index}, {offset}])"
+        )
 
     @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
@@ -362,7 +377,9 @@ class ParsedBuffer:
                 return item
         raise Exception("Couldn't find project.")
 
-    # I have to find another name for this.
+    # TODO: I have to find another name for this.
+    # Also: there is a big assumption: `self` should be synced with Todoist (all ids
+    # are available) whereas `other` might not be.
     def compare_with(self, other):
         diff = Diff(self, other)
 
