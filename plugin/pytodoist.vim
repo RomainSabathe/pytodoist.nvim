@@ -18,3 +18,7 @@ nnoremap <silent> <leader>T :call LoadTasks()<CR>
 
 ":highlight MyGroup ctermbg=green guibg=green
 ":let m = matchadd("MyGroup", "something")
+
+function! CaptureFzfOutput(cmd)
+    let g:fzf_output = a:cmd
+endfunction

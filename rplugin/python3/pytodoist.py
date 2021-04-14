@@ -1,3 +1,4 @@
+import subprocess
 from abc import abstractmethod
 import os
 import re
@@ -11,10 +12,6 @@ import todoist
 
 NULL = "null"
 SMART_TAG = True
-
-import re
-import subprocess
-from pathlib import Path
 
 
 @neovim.plugin
@@ -58,12 +55,31 @@ class Plugin(object):
     def register_updated_line(self):
         pass
 
-    @neovim.function("MoveTask", sync=True, range=True)
+    def _input_project_from_fzf(self) -> str:
+        projects = [project.name for project in self.todoist.projects]
+
+        # This command instantiates a global vimscript variable named `fzf_output`.
+        self.nvim.api.command(
+            "call fzf#run({"
+            "'sink': function('CaptureFzfOutput'),"
+            f"'source': {projects}"
+            "})"
+        )
+        # However fzf#run returns directly (it doesn't wait for the user to complete
+        # its input).
+        # So we hack together a wait to constantly check if the user has finished.
+        fzf_output = None
+        while fzf_output is None:
+            try:
+                fzf_output = self.nvim.api.eval("fzf_output")
+            except:
+                pass
+
+        return fzf_output
+
+    @neovim.function("MoveTask", sync=False, range=True)
     def move_task(self, args, _range):
-        self.nvim.api.command("call inputsave()")
-        self.nvim.api.command(f"let project_name = input('Project: ')")
-        self.nvim.api.command("call inputrestore()")
-        project_name = self.nvim.api.eval("project_name")
+        project_name = self._input_project_from_fzf()
         if project_name == "":
             return
 
@@ -72,9 +88,9 @@ class Plugin(object):
 
         project = self.todoist.get_project_by_name(project_name)
 
-        # TODO: still unsure if we want to do this...
-        # item = self.parsed_buffer[line_index - 1]
-        # item.move(project_id=project.id)
+        # # TODO: still unsure if we want to do this...
+        # # item = self.parsed_buffer[line_index - 1]
+        # # item.move(project_id=project.id)
 
         # Finding where to paste the tasks.
         for i, item in enumerate(self.parsed_buffer):
@@ -90,9 +106,12 @@ class Plugin(object):
                 break
 
         # We need to paste the line(s) at position `i + j - 1`.
-        # For each line, we delete and paste. We go backwards to preserve the ordering.
+        # For each line, we delete and paste.
+        # We execute whatever is closest to the end of the file first, to preserve
+        # line ordering.
+        # TODO: something is still off.
         self.nvim.api.command(f"{_range[0]},{_range[1]}d")
-        self.nvim.api.command(f"{i+j}pu")
+        self.nvim.api.command(f"{i+j-1}pu")
         self.nvim.api.command(
             f"call setpos('.', [{buf_index}, {line_index}, {col_index}, {offset}])"
         )
@@ -108,7 +127,8 @@ class Plugin(object):
             else:
                 self.nvim.current.buffer.append(item)
 
-        self.nvim.api.command("w!")  # Cancel the "modified" state of the buffer.
+        # Cancel the "modified" state of the buffer.
+        self.nvim.api.command("w!")
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         # self._refresh_colors()
 
@@ -122,7 +142,7 @@ class Plugin(object):
                 break
         self.nvim.api.command("enew")
         self.nvim.api.command("set filetype=todoist")
-        self.nvim.api.command("file todoist")  # Set the filename.
+        self.nvim.api.command("file .todoist")  # Set the filename.
 
     def _get_current_line_index(self):
         return self.nvim.eval("line('.')")
