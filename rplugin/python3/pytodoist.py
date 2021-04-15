@@ -125,9 +125,9 @@ class Plugin(object):
     @neovim.function("TodoistCleanup", sync=True)
     def todoist_cleanup(self, args):
         """Delete the tasks that are empty."""
+        # TODO: redistribute the child-orders if there are clashes.
         for task in self.todoist.tasks:
             if task.content == "":
-                self.nvim.api.command(f"echom 'Will delete: {task.content}'")
                 task.delete()
         self.todoist.commit()
         self.load_tasks([])
