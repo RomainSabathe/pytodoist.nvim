@@ -200,6 +200,8 @@ class TodoistInterface:
 
     def __iter__(self):
         for project in self.projects:
+            if not project.isvalid():
+                continue
             yield project
             yield ProjectUnderline(project_name=project.name)
             for task in sorted(self.tasks, key=lambda task: task.child_order):
@@ -259,6 +261,11 @@ class Project:
         if "name" in kwargs.keys():
             self.name = kwargs["name"]
         return to_return
+
+    def isvalid(self):
+        if self.data is None:
+            return True
+        return not (self.data["is_archived"] or self.data["is_deleted"])
 
 
 class Task:
