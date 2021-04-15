@@ -23,35 +23,39 @@ class Plugin(object):
         self.todoist = TodoistInterface(
             todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY"))
         )
+        self.parsed_buffer_since_last_save = None
         self.parsed_buffer = None
 
     def _get_buffer_content(self) -> List[str]:
         return self.nvim.current.buffer[:]
 
-    @neovim.autocmd("InsertEnter", pattern="todoist", sync=False)
+    @neovim.autocmd("InsertEnter", pattern=".todoist", sync=False)
     def register_current_line(self):
         pass
 
-    @neovim.autocmd("CursorMoved", pattern="todoist", sync=True)
+    @neovim.autocmd("CursorMoved", pattern=".todoist", sync=True)
     def cursor_moved(self):
-        pass
+        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
 
-    @neovim.autocmd("BufWritePre", pattern="todoist", sync=True)
+    @neovim.autocmd("BufWritePre", pattern=".todoist", sync=True)
     def save_buffer(self):
-        if self.parsed_buffer is None:
+        if self.parsed_buffer_since_last_save is None:
             # This is triggered at the first initialization of `_load_tasks`.
             # If we don't return early, we'd be stuck in an endless loop of syncing
             # and saving.
             return
 
         updated_buffer = ParsedBuffer(self._get_buffer_content())
-        self.parsed_buffer.compare_with(updated_buffer)
+        self.parsed_buffer_since_last_save.compare_with(updated_buffer)
         self.todoist.commit()
         self.todoist.sync()
+        self.parsed_buffer_since_last_save = ParsedBuffer(
+            self._get_buffer_content(), self.todoist
+        )
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         # self.load_tasks(None)
 
-    @neovim.autocmd("InsertLeave", pattern="todoist", sync=True)
+    @neovim.autocmd("InsertLeave", pattern=".todoist", sync=True)
     def register_updated_line(self):
         pass
 
@@ -59,6 +63,7 @@ class Plugin(object):
         projects = [project.name for project in self.todoist.projects]
 
         # This command instantiates a global vimscript variable named `fzf_output`.
+        self.nvim.api.command("call ResetFzfOutput()")
         self.nvim.api.command(
             "call fzf#run({"
             "'sink': function('CaptureFzfOutput'),"
@@ -79,6 +84,7 @@ class Plugin(object):
 
     @neovim.function("MoveTask", sync=False, range=True)
     def move_task(self, args, _range):
+        self.nvim.api.command("set modifiable")
         project_name = self._input_project_from_fzf()
         if project_name == "":
             return
@@ -129,6 +135,9 @@ class Plugin(object):
 
         # Cancel the "modified" state of the buffer.
         self.nvim.api.command("w!")
+        self.parsed_buffer_since_last_save = ParsedBuffer(
+            self._get_buffer_content(), self.todoist
+        )
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         # self._refresh_colors()
 

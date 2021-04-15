@@ -22,3 +22,9 @@ nnoremap <silent> <leader>T :call LoadTasks()<CR>
 function! CaptureFzfOutput(cmd)
     let g:fzf_output = a:cmd
 endfunction
+
+function! ResetFzfOutput()
+    if exists("g:fzf_output")
+        unlet g:fzf_output
+    endif
+endfunction
