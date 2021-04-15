@@ -122,6 +122,16 @@ class Plugin(object):
             f"call setpos('.', [{buf_index}, {line_index}, {col_index}, {offset}])"
         )
 
+    @neovim.function("TodoistCleanup", sync=True)
+    def todoist_cleanup(self, args):
+        """Delete the tasks that are empty."""
+        for task in self.todoist.tasks:
+            if task.content == "":
+                self.nvim.api.command(f"echom 'Will delete: {task.content}'")
+                task.delete()
+        self.todoist.commit()
+        self.load_tasks([])
+
     @neovim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
         self._clear_buffer()
@@ -142,10 +152,11 @@ class Plugin(object):
         # self._refresh_colors()
 
     def _clear_buffer(self):
+        # TODO: write this in vimscript.
         # If there is a buffer with name 'todoist', we must close it first.
         for buffer in self.nvim.api.list_bufs():
             filepath = Path(buffer.api.get_name())
-            if filepath.name == "todoist":
+            if filepath.name == ".todoist":
                 # We found a 'todoist' buffer. We delete it.
                 self.nvim.command(f"bdelete! {buffer.number}")
                 break
