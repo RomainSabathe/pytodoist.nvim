@@ -33,9 +33,10 @@ class Plugin(object):
     def register_current_line(self):
         pass
 
-    @neovim.autocmd("CursorMoved", pattern=".todoist", sync=True)
+    @neovim.autocmd("CursorMoved", pattern=".todoist", sync=False)
     def cursor_moved(self):
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_highlights()
 
     @neovim.autocmd("BufWritePre", pattern=".todoist", sync=True)
     def save_buffer(self):
@@ -53,6 +54,8 @@ class Plugin(object):
             self._get_buffer_content(), self.todoist
         )
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._setup_highlight_groups()
+        self._refresh_highlights()
         # self.load_tasks(None)
 
     @neovim.autocmd("InsertLeave", pattern=".todoist", sync=True)
