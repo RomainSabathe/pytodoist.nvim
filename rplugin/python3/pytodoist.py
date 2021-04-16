@@ -149,7 +149,8 @@ class Plugin(object):
             self._get_buffer_content(), self.todoist
         )
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
-        # self._refresh_colors()
+        self._setup_highlight_groups()
+        self._refresh_highlights()
 
     def _clear_buffer(self):
         # TODO: write this in vimscript.
@@ -169,6 +170,41 @@ class Plugin(object):
 
     def _get_number_of_lines(self):
         return self.nvim.current.buffer.api.line_count()
+
+    def _setup_highlight_groups(self):
+        for i, item in enumerate(self.parsed_buffer):
+            if isinstance(item, Project):
+                # Setting up color for the project's name itself
+                # TODO: have a function returning this group_name. The naming logic
+                # should be centralized.
+                group_name = f"Project{sanitize_str(item.name)}"
+                self.nvim.api.command(
+                    f"highlight {group_name} "
+                    f"cterm=bold gui=bold "
+                    f"guifg={item.rgbcolor}"
+                )
+                # Setting up color for the project's tasks
+                group_name = f"Tasks{sanitize_str(item.name)}"
+                self.nvim.api.command(
+                    f"highlight {group_name} "
+                    f"gui=NONE "
+                    f"guifg={item.rgbcolor}"
+                )
+
+    def _refresh_highlights(self):
+        highlight_group, highlight_group_suffix = None, None
+        for i, item in enumerate(self.parsed_buffer):
+            # We read the buffer from top to bottom. Every time we encounter a project,
+            # all subsequent items get assigned to its color. Until we find another
+            # project.
+            if isinstance(item, Project):
+                highlight_group_suffix = sanitize_str(item.name)
+
+            if isinstance(item, (Project, ProjectUnderline)):
+                highlight_group = f"Project{highlight_group_suffix}"
+            else:
+                highlight_group = f"Tasks{highlight_group_suffix}"
+            self.nvim.current.buffer.add_highlight(highlight_group, i, 0, -1)
 
     def echo(self, message: str):
         # Type `:help nvim_echo` for more info about the args.
@@ -239,6 +275,12 @@ class Project:
         if self.data is not None:
             return self.data["id"]
         return "[Not synced]"
+
+    @property
+    def rgbcolor(self):
+        if self.data is not None:
+            return BG_COLORS_ID_TO_HEX[self.data["color"]]
+        return "#ffffff"
 
     def __str__(self):
         return self.name
@@ -562,7 +604,8 @@ class Diff:
         diff_output = subprocess.run(
             ["diff", "-e", str(path_lhs), str(path_rhs)], capture_output=True
         )
-        diff_output = diff_output.stdout.decode()[:-1]  # Trimming the last "\n"
+        # Trimming the last "\n"
+        diff_output = diff_output.stdout.decode()[:-1]
 
         return diff_output.split("\n")
 
@@ -595,3 +638,15 @@ class DiffSegment:
 
     def __iter__(self):
         yield from self.modified_lines
+
+
+def sanitize_str(s):
+    # fmt: off
+    special_chars = [
+        " ", "-", ".", "&", "%", "$", "#", "@", "?", "!", "^", "*", "(", ")", "_",
+        "+", "=", "`", "~", r"\\", r"|"
+    ]
+    # fmt: on
+    for char in special_chars:
+        s = s.replace(char, "")
+    return s
