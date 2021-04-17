@@ -7,14 +7,14 @@ from typing import List, Optional, Union
 from copy import copy, deepcopy
 from dataclasses import dataclass
 
-import neovim
+import pynvim
 import todoist
 
 NULL = "null"
 SMART_TAG = True
 
 
-@neovim.plugin
+@pynvim.plugin
 class Plugin(object):
     def __init__(self, nvim):
         self.nvim = nvim
@@ -29,16 +29,16 @@ class Plugin(object):
     def _get_buffer_content(self) -> List[str]:
         return self.nvim.current.buffer[:]
 
-    @neovim.autocmd("InsertEnter", pattern=".todoist", sync=False)
+    @pynvim.autocmd("InsertEnter", pattern=".todoist", sync=False)
     def register_current_line(self):
         pass
 
-    @neovim.autocmd("CursorMoved", pattern=".todoist", sync=False)
+    @pynvim.autocmd("CursorMoved", pattern=".todoist", sync=False)
     def cursor_moved(self):
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         self._refresh_highlights()
 
-    @neovim.autocmd("BufWritePre", pattern=".todoist", sync=True)
+    @pynvim.autocmd("BufWritePre", pattern=".todoist", sync=True)
     def save_buffer(self):
         if self.parsed_buffer_since_last_save is None:
             # This is triggered at the first initialization of `_load_tasks`.
@@ -58,7 +58,7 @@ class Plugin(object):
         self._refresh_highlights()
         # self.load_tasks(None)
 
-    @neovim.autocmd("InsertLeave", pattern=".todoist", sync=True)
+    @pynvim.autocmd("InsertLeave", pattern=".todoist", sync=True)
     def register_updated_line(self):
         pass
 
@@ -85,7 +85,7 @@ class Plugin(object):
 
         return fzf_output
 
-    @neovim.function("MoveTask", sync=False, range=True)
+    @pynvim.function("MoveTask", sync=False, range=True)
     def move_task(self, args, _range):
         self.nvim.api.command("set modifiable")
         project_name = self._input_project_from_fzf()
@@ -125,7 +125,7 @@ class Plugin(object):
             f"call setpos('.', [{buf_index}, {line_index}, {col_index}, {offset}])"
         )
 
-    @neovim.function("TodoistCleanup", sync=True)
+    @pynvim.function("TodoistCleanup", sync=True)
     def todoist_cleanup(self, args):
         """Delete the tasks that are empty."""
         # TODO: redistribute the child-orders if there are clashes.
@@ -135,7 +135,7 @@ class Plugin(object):
         self.todoist.commit()
         self.load_tasks([])
 
-    @neovim.function("LoadTasks", sync=True)
+    @pynvim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
         self._clear_buffer()
         self.todoist.sync()
