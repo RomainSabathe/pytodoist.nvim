@@ -87,8 +87,11 @@ class Plugin(object):
 
     @pynvim.function("MoveTask", sync=False, range=True)
     def move_task(self, args, _range):
-        self.nvim.api.command("set modifiable")
-        project_name = self._input_project_from_fzf()
+        if len(args) == 0:
+            self.nvim.api.command("set modifiable")
+            project_name = self._input_project_from_fzf()
+        else:
+            project_name = args[0]
         if project_name == "":
             return
 
