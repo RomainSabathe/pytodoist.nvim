@@ -167,7 +167,8 @@ class Plugin(object):
                 # We found a 'todoist' buffer. We delete it.
                 self.nvim.command(f"bdelete! {buffer.number}")
                 break
-        self.nvim.api.command("enew")
+        # self.nvim.api.command("enew")
+        self.nvim.api.command("noswapfile enew")
         self.nvim.api.command("set filetype=todoist")
         self.nvim.api.command("file .todoist")  # Set the filename.
 
