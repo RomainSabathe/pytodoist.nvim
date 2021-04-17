@@ -38,6 +38,9 @@ def todoist_api():
     api.sync()
     return api
 
+class FakeItems(todoist.managers.items.ItemsManager):
+    def complete(self, id, date_completed):
+        pass
 
 class FakeApi(todoist.api.TodoistAPI):
     def __init__(self):
@@ -59,28 +62,38 @@ class FakeApi(todoist.api.TodoistAPI):
     def sync(self):
         pass
 
+    @property
+    def items(self):
+        return FakeItems(api=self)
+
     def _task_factory(self, task_id: int, project_id: int):
-        return {
-            "content": f"Task {task_id}",
-            "project_id": f"{project_id}",
-            "id": str(task_id),
-            "is_deleted": 0,
-            "in_history": 0,
-            "date_completed": None,
-            "child_order": (task_id - 1) % 3,
-            "parent_id": None,
-        }
+        return todoist.models.Item(
+            api=self,
+            data={
+                "content": f"Task {task_id}",
+                "project_id": f"{project_id}",
+                "id": str(task_id),
+                "is_deleted": 0,
+                "in_history": 0,
+                "date_completed": None,
+                "child_order": (task_id - 1) % 3,
+                "parent_id": None,
+            },
+        )
 
     def _project_factory(self, project_id: int):
-        return {
-            "name": f"Project {project_id}",
-            "id": f"{project_id}",
-            "is_archived": 0,
-            "is_deleted": 0,
-            "color": project_id + 30,
-            "parent_id": None,
-            "child_order": project_id,
-        }
+        return todoist.models.Project(
+            api=self,
+            data={
+                "name": f"Project {project_id}",
+                "id": f"{project_id}",
+                "is_archived": 0,
+                "is_deleted": 0,
+                "color": project_id + 30,
+                "parent_id": None,
+                "child_order": project_id,
+            },
+        )
 
 
 @pytest.fixture

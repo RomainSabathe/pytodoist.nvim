@@ -39,6 +39,14 @@ class Plugin(object):
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         self._refresh_highlights()
 
+    @pynvim.function("CompleteTask")
+    def complete_task(self, args):
+        line_index = self._get_current_line_index()
+        task = self.parsed_buffer[line_index - 1]
+        self.nvim.command("echo 'Task registered as completed.'")
+        task.complete(impact_remote=False)
+        self.nvim.command("d")
+
     @pynvim.autocmd("BufWritePre", pattern=".todoist", sync=True)
     def save_buffer(self):
         if self.parsed_buffer_since_last_save is None:
@@ -341,6 +349,7 @@ class TodoistInterface:
                 continue
             yield project
             yield ProjectUnderline(project_name=project.name)
+            # TODO: do the filtering, *then* the sorting. Will be faster.
             for task in sorted(self.tasks, key=lambda task: task.child_order):
                 if task.isin(project) and task.isvalid():
                     yield task
@@ -427,8 +436,14 @@ class Task:
             self.content = kwargs["content"]
         return to_return
 
-    def delete(self):
-        self.data.delete()
+    def complete(self, impact_remote: bool=True):
+        if impact_remote:
+            self.data.complete()
+        self.content = "[Completed]"
+
+    def delete(self, impact_remote: bool = True):
+        if impact_remote:
+            self.data.delete()
         self.content = "[Deleted]"
 
     def move(self, *args, **kwargs):
@@ -555,7 +570,11 @@ class ParsedBuffer:
                     self.todoist.add_task(content=item_after, project_id=project.id)
                 elif item_after is None or diff_segment.action_type == "d":
                     if isinstance(item_before, Task):
-                        item_before.delete()
+                        # TODO: Is it always a deletion? Can it be a completion?
+                        if item_before.content == "[Completed]":
+                            item_before.complete(impact_remote=True)
+                        else:
+                            item_before.delete(impact_remote=True)
                 else:
                     if isinstance(item_before, Task):
                         item_before.update(content=item_after)

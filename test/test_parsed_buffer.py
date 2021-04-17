@@ -133,7 +133,7 @@ def test_move_task_3(plugin, vim):
     # Moving `Task 5` to `Project 1`.
     plugin.load_tasks(args=[])
 
-    # Setting position to `Task 5`, which is located at line 4.
+    # Setting position to `Task 5`, which is located at line 10.
     line_index = 10
     vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
     # Moving this line to `Project 1`.
@@ -240,3 +240,32 @@ def test_move_task_5(plugin, vim):
     # In addition, the cursor should be on ``.
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
     assert vim.current.buffer[plugin._get_current_line_index()-1] == ""
+
+def test_complete_tasks(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Setting position to `Task 5`.
+    line_index = 10
+    vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
+
+    plugin.complete_task(args=[])
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 2",
+        "Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "",
+    ]
