@@ -49,6 +49,13 @@ class FakeApi(todoist.api.TodoistAPI):
             *[self._task_factory(i, project_id=3) for i in range(7, 10)],
         ]
 
+        # In order to test that the projects get displayed in the correct order, we
+        # alter the natural ordering.
+        self.state["projects"] = self.state["projects"][::-1]
+        # Setting `Project 2` as a child of `Project 1`.
+        self.state["projects"][1]["parent_id"] = "1"
+        self.state["projects"][1]["child_order"] = 1
+
     def sync(self):
         pass
 
@@ -61,6 +68,7 @@ class FakeApi(todoist.api.TodoistAPI):
             "in_history": 0,
             "date_completed": None,
             "child_order": (task_id - 1) % 3,
+            "parent_id": None,
         }
 
     def _project_factory(self, project_id: int):
@@ -70,6 +78,8 @@ class FakeApi(todoist.api.TodoistAPI):
             "is_archived": 0,
             "is_deleted": 0,
             "color": project_id + 30,
+            "parent_id": None,
+            "child_order": project_id,
         }
 
 
