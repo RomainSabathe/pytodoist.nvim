@@ -4,7 +4,7 @@ import pytest
 import todoist
 import pandas as pd
 
-from rplugin.python3.pytodoist import TasksWorld, World, AddDiff, get_diffs, interpret_raw_diff
+# from rplugin.python3.pytodoist import TasksWorld, World, AddDiff, get_diffs, interpret_raw_diff
 
 
 def test_initialize_task_world(todoist_api):

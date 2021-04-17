@@ -28,46 +28,35 @@ def test_interface(todoist_api):
         pass
 
 
-def test_move_task(plugin, vim):
+def test_load_tasks(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 2",
+        "Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 5",
+        "Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "",
+    ]
+
+
+def test_move_task_1(plugin, vim):
+    """Move a single task downwards in the buffer."""
     # Moving `Task 2` to `Project 2`.
-    # vim.current.buffer[:] = [
-    #     "Project 1",
-    #     "=========",
-    #     "Task 1",
-    #     "Task 2",  # Line 4
-    #     "Task 3",
-    #     "",
-    #     "Project 2",
-    #     "=========",
-    #     "Task 4",
-    #     "Task 5",
-    #     "Task 6",  # Line 11
-    #     "",
-    #     "Project 3",
-    #     "=========",
-    #     "Task 7",
-    #     "Task 8",
-    #     "Task 9",
-    #     "",
-    # ]
-
-    # plugin._clear_buffer()
-    # plugin.todoist.sync()
-    # for i, item in enumerate(plugin.todoist):
-    #     item = str(item)
-    #     if i == 0:
-    #         plugin.nvim.current.line = item
-    #     else:
-    #         plugin.nvim.current.buffer.append(item)
-    # import ipdb; ipdb.set_trace()
-    # pass
-    la = plugin.load_tasks(args=[])
-    import ipdb; ipdb.set_trace()
-    pass
-
-
-    parsed_buffer = ParsedBuffer(vim.current.buffer[:])
-    plugin.parsed_buffer = parsed_buffer
+    plugin.load_tasks(args=[])
 
     # Setting position to `Task 2`, which is located at line 4.
     line_index = 4
@@ -75,7 +64,179 @@ def test_move_task(plugin, vim):
     # Moving this line to `Project 2`.
     plugin.move_task(args=["Project 2"], _range=[line_index, line_index])
 
-    import ipdb
 
-    ipdb.set_trace()
-    pass
+    # Checking the task has been moved.
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 5",
+        "Task 6",
+        "Task 2",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "",
+    ]
+
+    # In addition, the cursor should be on `Task 3`.
+    # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
+    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Task 3"
+
+def test_move_task_2(plugin, vim):
+    """Move a single task downwards in the buffer, to the last project."""
+    # Moving `Task 2` to `Project 3` (which is the last project).
+    plugin.load_tasks(args=[])
+
+    # Setting position to `Task 2`, which is located at line 4.
+    line_index = 4
+    vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
+    # Moving this line to `Project 2`.
+    plugin.move_task(args=["Project 3"], _range=[line_index, line_index])
+
+    # Checking the task has been moved.
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 5",
+        "Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "Task 2",
+        "",
+    ]
+
+    # In addition, the cursor should be on `Task 3`.
+    # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
+    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Task 3"
+
+def test_move_task_3(plugin, vim):
+    """Move a single task upwards in the buffer."""
+    # Moving `Task 5` to `Project 1`.
+    plugin.load_tasks(args=[])
+
+    # Setting position to `Task 5`, which is located at line 4.
+    line_index = 10
+    vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
+    # Moving this line to `Project 1`.
+    plugin.move_task(args=["Project 1"], _range=[line_index, line_index])
+
+    # Checking the task has been moved.
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 2",
+        "Task 3",
+        "Task 5",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "",
+    ]
+
+    # In addition, the cursor should be on `Task 6`.
+    # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
+    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Task 6"
+
+def test_move_task_4(plugin, vim):
+    """Move multiple tasks downwards in the buffer."""
+    # Moving `Task 2` and `Task 3` to `Project 2`.
+    plugin.load_tasks(args=[])
+
+    # Setting position to `Task 2`, which is located at line 4.
+    line_index = 4
+    vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
+    # We move `Task 2` and `Task 3` to `Project 2`.
+    plugin.move_task(args=["Project 2"], _range=[line_index, line_index+1])
+
+
+    # Checking the task has been moved.
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 5",
+        "Task 6",
+        "Task 2",
+        "Task 3",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "",
+    ]
+
+    # In addition, the cursor should be on ``.
+    # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
+    assert vim.current.buffer[plugin._get_current_line_index()-1] == ""
+
+def test_move_task_5(plugin, vim):
+    """Move multiple tasks upwards in the buffer."""
+    # Moving `Task 8` and `Task 9` to `Project 1`.
+    plugin.load_tasks(args=[])
+
+    # Setting position to `Task 8`, which is located at line 16.
+    line_index = 16
+    vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
+    # And moving upwards.
+    plugin.move_task(args=["Project 1"], _range=[line_index, line_index+1])
+
+
+    # Checking the task has been moved.
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 2",
+        "Task 3",
+        "Task 8",
+        "Task 9",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 5",
+        "Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "",
+    ]
+
+    # In addition, the cursor should be on ``.
+    # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
+    assert vim.current.buffer[plugin._get_current_line_index()-1] == ""

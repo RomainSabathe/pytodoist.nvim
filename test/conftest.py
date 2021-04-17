@@ -16,7 +16,8 @@ os.environ["TODOIST_API_KEY"] = "test"
 def vim():
     child_argv = os.environ.get("NVIM_CHILD_ARGV")
     listen_address = os.environ.get("NVIM_LISTEN_ADDRESS")
-    listen_address = "/tmp/nvim"
+    # Enable this for interactive debugging.
+    # listen_address = "/tmp/nvim"
     if child_argv is None and listen_address is None:
         child_argv = '["nvim", "-u", "NONE", "--embed", "--headless"]'
 

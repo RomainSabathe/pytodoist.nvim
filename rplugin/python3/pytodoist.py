@@ -117,15 +117,22 @@ class Plugin(object):
                 # We finally found where to place the task.
                 break
 
-        # We need to paste the line(s) at position `i + j - 1`.
-        # For each line, we delete and paste.
-        # We execute whatever is closest to the end of the file first, to preserve
-        # line ordering.
-        # TODO: something is still off.
-        self.nvim.api.command(f"{_range[0]},{_range[1]}d")
-        self.nvim.api.command(f"{i+j-1}pu")
+        # Counting the number of lines that we want to move.
+        change_amplitude = _range[1] - _range[0] + 1
+
+        # We need to paste the line(s) at position `i + j `.
+        # First, copying.
+        self.nvim.api.command(f"{_range[0]},{_range[1]}y")
+        self.nvim.api.command(f"{i+j}pu")
+        # Then, deleting the original task.
+        # We need to be extra careful in case we move a task upwards in the buffer.
+        # In that case, the range of deletion has been shifted.
+        delta = 0 if _range[0] < i + j else change_amplitude
+        self.nvim.api.command(f"{_range[0]+delta},{_range[1]+delta}d")
         self.nvim.api.command(
-            f"call setpos('.', [{buf_index}, {line_index}, {col_index}, {offset}])"
+            f"call setpos('.',"
+            f"[{buf_index}, {line_index+delta}, {col_index}, {offset}]"
+            ")"
         )
 
     @pynvim.function("TodoistCleanup", sync=True)
@@ -142,12 +149,7 @@ class Plugin(object):
     def load_tasks(self, args):
         self._clear_buffer()
         self.todoist.sync()
-        for i, item in enumerate(self.todoist):
-            item = str(item)
-            if i == 0:
-                self.nvim.current.line = item
-            else:
-                self.nvim.current.buffer.append(item)
+        self.nvim.current.buffer[:] = [str(item) for item in self.todoist]
 
         # Cancel the "modified" state of the buffer.
         self.nvim.api.command("w!")
@@ -193,9 +195,7 @@ class Plugin(object):
                 # Setting up color for the project's tasks
                 group_name = f"Tasks{sanitize_str(item.name)}"
                 self.nvim.api.command(
-                    f"highlight {group_name} "
-                    f"gui=NONE "
-                    f"guifg={item.rgbcolor}"
+                    f"highlight {group_name} " f"gui=NONE " f"guifg={item.rgbcolor}"
                 )
 
     def _refresh_highlights(self):
