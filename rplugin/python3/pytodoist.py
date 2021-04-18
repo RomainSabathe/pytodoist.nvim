@@ -171,17 +171,20 @@ class Plugin(object):
 
     def _clear_buffer(self):
         # TODO: write this in vimscript.
-        # If there is a buffer with name 'todoist', we must close it first.
-        for buffer in self.nvim.api.list_bufs():
-            filepath = Path(buffer.api.get_name())
+        # If there already is a buffer with name 'todoist', we load it in the current
+        # window.
+        for i, buffer in enumerate(self.nvim.buffers):
+            filepath = Path(buffer.name)
             if filepath.name == ".todoist":
-                # We found a 'todoist' buffer. We delete it.
-                self.nvim.command(f"bdelete! {buffer.number}")
-                break
-        # self.nvim.api.command("enew")
-        self.nvim.api.command("noswapfile enew")
-        self.nvim.api.command("set filetype=todoist")
-        self.nvim.api.command("file .todoist")  # Set the filename.
+                # We found a 'todoist' buffer. We jump to it.
+                self.nvim.current.buffer = buffer
+                self.nvim.current.buffer[:] = []
+                return
+
+        # Otherwise we open a new buffer.
+        self.nvim.command("noswapfile enew")
+        self.nvim.command("set filetype=todoist")
+        self.nvim.command("file .todoist")  # Set the filename.
 
     def _get_current_line_index(self):
         return self.nvim.eval("line('.')")

@@ -269,3 +269,101 @@ def test_complete_tasks(plugin, vim):
         "Task 9",
         "",
     ]
+
+def test_load_tasks_when_using_multiple_windows(plugin, vim):
+    # Creating a first window and populating it with text.
+    assert vim.current.window.cursor == [1, 0]
+    vim.command('normal iThis text is not in the Todoist buffer')
+    assert vim.current.buffer[:] == ["This text is not in the Todoist buffer"]
+    # By default, `g:hidden` is set to "hide" which means that opening a new buffer
+    # can be done only if we save the changes here. Let's do this and load the tasks
+    # only after.
+    tmp_name = vim.eval('resolve(tempname())')
+    vim.current.buffer.name = tmp_name
+    vim.command("w")
+
+    # Opening up the Todoist buffer.
+    plugin.load_tasks(args=[])
+
+    # We should now have two buffers, and we should be located on the Todoist buffer.
+    assert len(vim.buffers) == 2
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 2",
+        "Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 5",
+        "Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "",
+    ]
+    assert vim.current.buffer.number == 2
+    # Checking that the content of the tmp buffer hasn't changed.
+    vim.command("1b")
+    assert vim.current.buffer[:] == ["This text is not in the Todoist buffer"]
+
+    # Now splitting in 2 windows. On the left, we'll have the tmp buffer, and on the
+    # right we'll have todoist.
+    vim.command("vsplit")
+    assert len(vim.windows) == 2
+    # The tmp buffer is shown on left and right windows. Now Todoist on the right window.
+    vim.current.window = vim.windows[1]
+    vim.command("2b")
+
+    # We place the cursor on `Project 2` (line 7) and load the tasks again.
+    vim.current.window.cursor = [7, 0]
+    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Project 2"
+
+    # We move once last time to the tmp buffer.
+    vim.command("1b")
+
+    # Now reloading the tasks.
+    plugin.load_tasks(args=[])
+
+    # We still should have 2 buffers.
+    assert len(vim.buffers) == 2
+
+    # We still should have 2 windows.
+    assert len(vim.windows) == 2
+
+    # The current buffer should have been changed, and now be set to the Todoist one.
+    assert vim.current.buffer.number == 2
+
+    # The content of the buffer should not have changed.
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "Task 1",
+        "Task 2",
+        "Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "Task 4",
+        "Task 5",
+        "Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "Task 7",
+        "Task 8",
+        "Task 9",
+        "",
+    ]
+
+    # The cursor should have been set at the same position.
+    # assert vim.current.buffer[plugin._get_current_line_index()-1] == "Project 2"
+
+    # The tmp buffer should also be intact.
+    vim.command("1b")
+    assert vim.current.buffer[:] == ["This text is not in the Todoist buffer"]
