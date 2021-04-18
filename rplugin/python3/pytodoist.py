@@ -156,9 +156,26 @@ class Plugin(object):
 
     @pynvim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
-        self._clear_buffer()
+        # Creating or loading the buffer.
+        if not self._todoist_buffer_exists():
+            self._create_todoist_buffer()
+        self._set_todoist_buffer_as_current()
+
+        # Storing the cursor position.
+        self.nvim.api.command("let position = getcurpos()")
+        buf_index, line_index, col_index, offset, _ = self.nvim.api.eval("position")
+
+        # Actually writing the tasks.
         self.todoist.sync()
         self.nvim.current.buffer[:] = [str(item) for item in self.todoist]
+
+        # Restoring the cursor position.
+        # We need to be mindful of the case where there were changes on the Todoist
+        # server, and we end up with a new buffer that has less lines than before.
+        new_line_index = min(line_index, len(self.nvim.current.buffer) - 1)
+        self.nvim.api.command(
+            f"call setpos('.', [{buf_index}, {new_line_index}, {col_index}, {offset}])"
+        )
 
         # Cancel the "modified" state of the buffer.
         self.nvim.api.command("w!")
@@ -169,19 +186,22 @@ class Plugin(object):
         self._setup_highlight_groups()
         self._refresh_highlights()
 
-    def _clear_buffer(self):
-        # TODO: write this in vimscript.
-        # If there already is a buffer with name 'todoist', we load it in the current
-        # window.
+    def _todoist_buffer_exists(self):
+        for i, buffer in enumerate(self.nvim.buffers):
+            filepath = Path(buffer.name)
+            if filepath.name == ".todoist":
+                return True
+        return False
+
+    def _set_todoist_buffer_as_current(self):
         for i, buffer in enumerate(self.nvim.buffers):
             filepath = Path(buffer.name)
             if filepath.name == ".todoist":
                 # We found a 'todoist' buffer. We jump to it.
                 self.nvim.current.buffer = buffer
-                self.nvim.current.buffer[:] = []
                 return
 
-        # Otherwise we open a new buffer.
+    def _create_todoist_buffer(self):
         self.nvim.command("noswapfile enew")
         self.nvim.command("set filetype=todoist")
         self.nvim.command("file .todoist")  # Set the filename.
@@ -338,12 +358,16 @@ class TodoistInterface:
     def iterprojects(self, root: Project = None):
         if root is not None:
             yield root
-            next_projects = sorted(root.children, key=lambda project: project.child_order)
+            next_projects = sorted(
+                root.children, key=lambda project: project.child_order
+            )
             for next_project in next_projects:
                 yield from self.iterprojects(next_project)
         else:
             root_projects = [project for project in self.projects if project.isroot]
-            for project in sorted(root_projects, key=lambda project: project.child_order):
+            for project in sorted(
+                root_projects, key=lambda project: project.child_order
+            ):
                 yield from self.iterprojects(root=project)
 
     def __iter__(self):
@@ -439,7 +463,7 @@ class Task:
             self.content = kwargs["content"]
         return to_return
 
-    def complete(self, impact_remote: bool=True):
+    def complete(self, impact_remote: bool = True):
         if impact_remote:
             self.data.complete()
         self.content = "[Completed]"

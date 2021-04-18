@@ -362,7 +362,7 @@ def test_load_tasks_when_using_multiple_windows(plugin, vim):
     ]
 
     # The cursor should have been set at the same position.
-    # assert vim.current.buffer[plugin._get_current_line_index()-1] == "Project 2"
+    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Project 2"
 
     # The tmp buffer should also be intact.
     vim.command("1b")
