@@ -186,6 +186,9 @@ class Plugin(object):
         self._setup_highlight_groups()
         self._refresh_highlights()
 
+        # Emiting a message to confirm.
+        self.nvim.command("echo 'Tasks loaded successfully.'")
+
     def _todoist_buffer_exists(self):
         for i, buffer in enumerate(self.nvim.buffers):
             filepath = Path(buffer.name)
