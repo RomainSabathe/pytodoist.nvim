@@ -178,6 +178,9 @@ class Plugin(object):
         )
 
         # Cancel the "modified" state of the buffer.
+        # TODO: clean this.
+        # TODO: before doing this; check that the buffer is not in a modified state.
+        self.parsed_buffer_since_last_save = None  # Prevents remote updated.
         self.nvim.api.command("w!")
         self.parsed_buffer_since_last_save = ParsedBuffer(
             self._get_buffer_content(), self.todoist
