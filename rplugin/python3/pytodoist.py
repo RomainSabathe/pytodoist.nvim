@@ -34,8 +34,18 @@ class Plugin(object):
     def register_current_line(self):
         pass
 
-    @pynvim.autocmd("CursorMoved", pattern=".todoist", sync=False)
-    def cursor_moved(self):
+    @pynvim.autocmd("TextYankPost", pattern=".todoist", sync=False)
+    def text_yank_post(self):
+        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_highlights()
+
+    @pynvim.autocmd("InsertLeave", pattern=".todoist", sync=False)
+    def insert_leave(self):
+        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_highlights()
+
+    @pynvim.autocmd("TextChanged", pattern=".todoist", sync=False)
+    def text_changed(self):
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
         self._refresh_highlights()
 
@@ -153,6 +163,15 @@ class Plugin(object):
                 task.delete()
         self.todoist.commit()
         self.load_tasks([])
+
+    @pynvim.function("TempMarkThisWeek", sync=True)
+    def tmp_mark_this_week(self, args):
+        line_index = self._get_current_line_index()
+        task = self.parsed_buffer[line_index - 1]
+        current_labels = task.data["labels"]
+        new_labels = [2156631975, *current_labels]
+        task.data.update(labels=new_labels)
+        self.todoist.commit()
 
     @pynvim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
