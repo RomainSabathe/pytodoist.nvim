@@ -343,92 +343,19 @@ class Project:
         return not (self.data["is_archived"] or self.data["is_deleted"])
 
 
-class TodoistInterface:
-    def __init__(self, todoist_api: todoist.api.TodoistAPI):
-        self.api = todoist_api
-        self.tasks = None
-        self.projects = None
-
-    def sync(self):
-        self.api.sync()
-        self.tasks = [Task(data=item) for item in self.api.state["items"]]
-        self.projects = self._init_projects()
-
-    def _init_projects(self):
-        # First pass: not considering the children or anything.
-        projects = [Project(data=item) for item in self.api.state["projects"]]
-
-        # Second pass: assigning children.
-        for i, project in enumerate(projects):
-            if project.data["parent_id"] is not None:
-                # Searching for the parent.
-                for parent_project in projects:
-                    if parent_project.id == project.data["parent_id"]:
-                        parent_project.children.append(project)
-
-        return projects
-
-    def get_project_by_name(self, project_name):
-        for project in self.projects:
-            if project_name.lower() == project.name.lower():
-                return project
-        return None
-
-    def get_task_by_content(self, content):
-        for task in self.tasks:
-            if content == task.content:
-                return task
-        return None
-
-    def iterprojects(self, root: Project = None):
-        if root is not None:
-            yield root
-            next_projects = sorted(
-                root.children, key=lambda project: project.child_order
-            )
-            for next_project in next_projects:
-                yield from self.iterprojects(next_project)
-        else:
-            root_projects = [project for project in self.projects if project.isroot]
-            for project in sorted(
-                root_projects, key=lambda project: project.child_order
-            ):
-                yield from self.iterprojects(root=project)
-
-    def __iter__(self):
-        for project in self.iterprojects():
-            if not project.isvalid():
-                continue
-            yield project
-            yield ProjectUnderline(project_name=project.name)
-            # TODO: do the filtering, *then* the sorting. Will be faster.
-            for task in sorted(self.tasks, key=lambda task: task.child_order):
-                if task.isin(project) and task.isvalid():
-                    yield task
-            yield ProjectSeparator()
-
-    def add_task(self, *args, **kwargs):
-        # We populate this fields because the `isvalid` function will use it.
-        if "is_deleted" not in kwargs.keys():
-            kwargs["is_deleted"] = False
-        if "in_history" not in kwargs.keys():
-            kwargs["in_history"] = False
-        if "date_completed" not in kwargs.keys():
-            kwargs["date_completed"] = None
-        if "child_order" not in kwargs.keys():
-            kwargs["child_order"] = 99  # TODO: dirty.
-        return self.api.items.add(*args, **kwargs)
-
-    def commit(self):
-        return self.api.commit()
-
-
 class Task:
-    def __init__(self, content: str = None, data: todoist.models.Item = None):
+    def __init__(
+        self,
+        content: str = None,
+        data: todoist.models.Item = None,
+        children: List["Project"] = None,
+    ):
         assert content is not None or data is not None
         self.content = content
         self.data = data
         self.depth = 0
+        if children is None:
+            self.children = []
 
         if data is not None and content is None:
             self.content = data["content"]
@@ -444,6 +371,12 @@ class Task:
         if self.data is not None:
             return self.data["child_order"]
         return 1
+
+    @property
+    def isroot(self):
+        if self.data is not None:
+            return self.data["parent_id"] is None
+        return True
 
     def __repr__(self) -> str:
         short_content = (
@@ -511,6 +444,112 @@ class ProjectUnderline:
 
     def __str__(self):
         return "=" * len(self.project_name)
+
+
+class TodoistInterface:
+    def __init__(self, todoist_api: todoist.api.TodoistAPI):
+        self.api = todoist_api
+        self.tasks = None
+        self.projects = None
+
+    def sync(self):
+        self.api.sync()
+        self.tasks = self._init_tasks()
+        self.projects = self._init_projects()
+
+    def _init_projects(self):
+        # First pass: not considering the children or anything.
+        projects = [Project(data=item) for item in self.api.state["projects"]]
+
+        # Second pass: assigning children.
+        for i, project in enumerate(projects):
+            if project.data["parent_id"] is not None:
+                # Searching for the parent.
+                for parent_project in projects:
+                    if parent_project.id == project.data["parent_id"]:
+                        parent_project.children.append(project)
+
+        return projects
+
+    def _init_tasks(self):
+        # First pass: not considering the children or anything.
+        tasks = [Task(data=item) for item in self.api.state["items"]]
+
+        # Second pass: assigning children.
+        for i, task in enumerate(tasks):
+            if task.data["parent_id"] is not None:
+                # Searching for the parent.
+                for parent_task in tasks:
+                    if parent_task.id == task.data["parent_id"]:
+                        parent_task.children.append(task)
+
+        return tasks
+
+    def get_project_by_name(self, project_name):
+        for project in self.projects:
+            if project_name.lower() == project.name.lower():
+                return project
+        return None
+
+    def get_task_by_content(self, content):
+        for task in self.tasks:
+            if content == task.content:
+                return task
+        return None
+
+    def iterprojects(self, root: Project = None):
+        if root is not None:
+            yield root
+            next_projects = sorted(
+                root.children, key=lambda project: project.child_order
+            )
+            for next_project in next_projects:
+                yield from self.iterprojects(next_project)
+        else:
+            root_projects = [project for project in self.projects if project.isroot]
+            for project in sorted(
+                root_projects, key=lambda project: project.child_order
+            ):
+                yield from self.iterprojects(root=project)
+
+    def itertasks(self, root: Task = None):
+        if root is not None:
+            yield root
+            next_tasks = sorted(root.children, key=lambda task: task.child_order)
+            for next_task in next_tasks:
+                yield from self.itertasks(next_task)
+        else:
+            root_tasks = [task for task in self.tasks if task.isroot]
+            for task in sorted(root_tasks, key=lambda task: task.child_order):
+                yield from self.itertasks(root=task)
+
+    def __iter__(self):
+        for project in self.iterprojects():
+            if not project.isvalid():
+                continue
+            yield project
+            yield ProjectUnderline(project_name=project.name)
+            # TODO: do the filtering, *then* the sorting. Will be faster.
+            # project_tasks = [task for task in self.tasks if task.isin(project)]
+            for task in self.itertasks():
+                if task.isin(project) and task.isvalid():
+                    yield task
+            yield ProjectSeparator()
+
+    def add_task(self, *args, **kwargs):
+        # We populate this fields because the `isvalid` function will use it.
+        if "is_deleted" not in kwargs.keys():
+            kwargs["is_deleted"] = False
+        if "in_history" not in kwargs.keys():
+            kwargs["in_history"] = False
+        if "date_completed" not in kwargs.keys():
+            kwargs["date_completed"] = None
+        if "child_order" not in kwargs.keys():
+            kwargs["child_order"] = 99  # TODO: dirty.
+        return self.api.items.add(*args, **kwargs)
+
+    def commit(self):
+        return self.api.commit()
 
 
 class ProjectSeparator:

@@ -59,6 +59,12 @@ class FakeApi(todoist.api.TodoistAPI):
         self.state["projects"][1]["parent_id"] = "1"
         self.state["projects"][1]["child_order"] = 1
 
+        # We do the same for the tasks.
+        self.state["items"] = self.state["items"][::-1]
+        # Setting `Task 8` as a child of `Task 7`.
+        self.state["items"][7]["parent_id"] = "6"
+        self.state["items"][7]["child_order"] = 1
+
     def sync(self):
         pass
 

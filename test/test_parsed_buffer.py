@@ -1,26 +1,26 @@
 from rplugin.python3.pytodoist import ParsedBuffer
 
 
-def test_init():
-    from pathlib import Path
+# def test_init():
+#     from pathlib import Path
 
-    lines = Path("/tmp/todoist").read_text().split("\n")
-    parsed_buffer = ParsedBuffer(lines)
-    result = parsed_buffer.parse_lines()
+#     lines = Path("/tmp/todoist").read_text().split("\n")
+#     parsed_buffer = ParsedBuffer(lines)
+#     result = parsed_buffer.parse_lines()
 
 
-def test_diff(todoist_api):
-    from pathlib import Path
+# def test_diff(todoist_api):
+#     from pathlib import Path
 
-    # lines_before = Path("/tmp/todoist_before").read_text().split("\n")
-    lines_before = Path("/tmp/lhs").read_text().split("\n")
-    buffer_before = ParsedBuffer(lines_before, todoist_api)
+#     # lines_before = Path("/tmp/todoist_before").read_text().split("\n")
+#     lines_before = Path("/tmp/lhs").read_text().split("\n")
+#     buffer_before = ParsedBuffer(lines_before, todoist_api)
 
-    # lines_after = Path("/tmp/todoist_after").read_text().split("\n")
-    lines_after = Path("/tmp/rhs").read_text().split("\n")
-    buffer_after = ParsedBuffer(lines_after)
+#     # lines_after = Path("/tmp/todoist_after").read_text().split("\n")
+#     lines_after = Path("/tmp/rhs").read_text().split("\n")
+#     buffer_after = ParsedBuffer(lines_after)
 
-    buffer_before.compare_with(buffer_after)
+#     buffer_before.compare_with(buffer_after)
 
 
 def test_interface(todoist_api):
