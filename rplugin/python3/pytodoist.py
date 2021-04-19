@@ -388,7 +388,7 @@ class Task:
         buffer = ""
         for _ in range(self.depth):
             buffer += "    "
-        buffer += self.content
+        buffer += f"[ ] {self.content}"
         return buffer
 
     def __hash__(self):
@@ -596,7 +596,19 @@ class ParsedBuffer:
                 continue
 
             # The remaining possibilities are: a proper task or a ProjectSeparator.
-            item = Task(content=line) if line != "" else ProjectSeparator()
+            if line == "":
+                item = ProjectSeparator()
+            else:
+                # A task is formed as one of these  possibilities:
+                # [ ] A task
+                # [x] A task
+                # [X] A task
+                pattern = r"^\[(x|X| )\] (?P<content>.*)$"
+                match_results = re.match(pattern, line)
+                if match_results is None:
+                    raise NotImplementedError
+                item = Task(content=match_results.group("content"))
+
             items.append(item)
             k += 1
         return items

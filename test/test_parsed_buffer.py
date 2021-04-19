@@ -1,4 +1,4 @@
-from rplugin.python3.pytodoist import ParsedBuffer
+from rplugin.python3.pytodoist import ParsedBuffer, Project, Task, ProjectUnderline
 
 
 # def test_init():
@@ -34,21 +34,21 @@ def test_load_tasks(plugin, vim):
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 2",
-        "Task 3",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 5",
-        "Task 6",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
     ]
 
@@ -64,32 +64,32 @@ def test_move_task_1(plugin, vim):
     # Moving this line to `Project 2`.
     plugin.move_task(args=["Project 2"], _range=[line_index, line_index])
 
-
     # Checking the task has been moved.
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 3",
+        "[ ] Task 1",
+        "[ ] Task 3",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 5",
-        "Task 6",
-        "Task 2",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "[ ] Task 2",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
     ]
 
     # In addition, the cursor should be on `Task 3`.
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
-    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Task 3"
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 3"
+
 
 def test_move_task_2(plugin, vim):
     """Move a single task downwards in the buffer, to the last project."""
@@ -106,27 +106,28 @@ def test_move_task_2(plugin, vim):
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 3",
+        "[ ] Task 1",
+        "[ ] Task 3",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 5",
-        "Task 6",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
-        "Task 2",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "[ ] Task 2",
         "",
     ]
 
     # In addition, the cursor should be on `Task 3`.
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
-    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Task 3"
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 3"
+
 
 def test_move_task_3(plugin, vim):
     """Move a single task upwards in the buffer."""
@@ -143,27 +144,28 @@ def test_move_task_3(plugin, vim):
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 2",
-        "Task 3",
-        "Task 5",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
+        "[ ] Task 5",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 6",
+        "[ ] Task 4",
+        "[ ] Task 6",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
     ]
 
     # In addition, the cursor should be on `Task 6`.
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
-    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Task 6"
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 6"
+
 
 def test_move_task_4(plugin, vim):
     """Move multiple tasks downwards in the buffer."""
@@ -174,34 +176,34 @@ def test_move_task_4(plugin, vim):
     line_index = 4
     vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
     # We move `Task 2` and `Task 3` to `Project 2`.
-    plugin.move_task(args=["Project 2"], _range=[line_index, line_index+1])
-
+    plugin.move_task(args=["Project 2"], _range=[line_index, line_index + 1])
 
     # Checking the task has been moved.
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
+        "[ ] Task 1",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 5",
-        "Task 6",
-        "Task 2",
-        "Task 3",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "[ ] Task 2",
+        "[ ] Task 3",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
     ]
 
     # In addition, the cursor should be on ``.
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
-    assert vim.current.buffer[plugin._get_current_line_index()-1] == ""
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == ""
+
 
 def test_move_task_5(plugin, vim):
     """Move multiple tasks upwards in the buffer."""
@@ -212,34 +214,34 @@ def test_move_task_5(plugin, vim):
     line_index = 16
     vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
     # And moving upwards.
-    plugin.move_task(args=["Project 1"], _range=[line_index, line_index+1])
-
+    plugin.move_task(args=["Project 1"], _range=[line_index, line_index + 1])
 
     # Checking the task has been moved.
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 2",
-        "Task 3",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 5",
-        "Task 6",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
         "",
         "Project 3",
         "=========",
-        "Task 7",
+        "[ ] Task 7",
         "",
     ]
 
     # In addition, the cursor should be on ``.
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
-    assert vim.current.buffer[plugin._get_current_line_index()-1] == ""
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == ""
+
 
 def test_complete_tasks(plugin, vim):
     plugin.load_tasks(args=[])
@@ -253,32 +255,33 @@ def test_complete_tasks(plugin, vim):
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 2",
-        "Task 3",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 6",
+        "[ ] Task 4",
+        "[ ] Task 6",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
     ]
+
 
 def test_load_tasks_when_using_multiple_windows(plugin, vim):
     # Creating a first window and populating it with text.
     assert vim.current.window.cursor == [1, 0]
-    vim.command('normal iThis text is not in the Todoist buffer')
+    vim.command("normal iThis text is not in the Todoist buffer")
     assert vim.current.buffer[:] == ["This text is not in the Todoist buffer"]
     # By default, `g:hidden` is set to "hide" which means that opening a new buffer
     # can be done only if we save the changes here. Let's do this and load the tasks
     # only after.
-    tmp_name = vim.eval('resolve(tempname())')
+    tmp_name = vim.eval("resolve(tempname())")
     vim.current.buffer.name = tmp_name
     vim.command("w")
 
@@ -290,21 +293,21 @@ def test_load_tasks_when_using_multiple_windows(plugin, vim):
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 2",
-        "Task 3",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 5",
-        "Task 6",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
     ]
     assert vim.current.buffer.number == 2
@@ -322,7 +325,7 @@ def test_load_tasks_when_using_multiple_windows(plugin, vim):
 
     # We place the cursor on `Project 2` (line 7) and load the tasks again.
     vim.current.window.cursor = [7, 0]
-    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Project 2"
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "Project 2"
 
     # We move once last time to the tmp buffer.
     vim.command("1b")
@@ -343,27 +346,45 @@ def test_load_tasks_when_using_multiple_windows(plugin, vim):
     assert vim.current.buffer[:] == [
         "Project 1",
         "=========",
-        "Task 1",
-        "Task 2",
-        "Task 3",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
         "",
         "Project 2",
         "=========",
-        "Task 4",
-        "Task 5",
-        "Task 6",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
         "",
         "Project 3",
         "=========",
-        "Task 7",
-        "Task 8",
-        "Task 9",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
         "",
     ]
 
     # The cursor should have been set at the same position.
-    assert vim.current.buffer[plugin._get_current_line_index()-1] == "Project 2"
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "Project 2"
 
     # The tmp buffer should also be intact.
     vim.command("1b")
     assert vim.current.buffer[:] == ["This text is not in the Todoist buffer"]
+
+
+def test_parsed_buffer_2(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    assert isinstance(plugin.parsed_buffer[0], Project)
+    assert plugin.parsed_buffer[0].name == "Project 1"
+    assert plugin.parsed_buffer[0].id == "1"
+
+    assert isinstance(plugin.parsed_buffer[1], ProjectUnderline)
+
+    assert isinstance(plugin.parsed_buffer[2], Task)
+    assert plugin.parsed_buffer[2].content == "Task 1"
+    assert plugin.parsed_buffer[2].id == "1"
+
+    assert isinstance(plugin.parsed_buffer[3], Task)
+    assert plugin.parsed_buffer[3].content == "Task 2"
+    assert plugin.parsed_buffer[3].id == "2"
