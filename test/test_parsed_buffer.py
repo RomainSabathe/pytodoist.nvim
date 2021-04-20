@@ -568,3 +568,28 @@ def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
         "[ ] Task 9",
         "",
     ]
+
+def test_add_task(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Placing the cursor at `[ ] Task 2`.
+    # We add a new task called `Task 10`.
+    vim.command("call setpos('.', [1, 4, 1, 0])")
+    vim.command("normal oTask 10")
+    plugin.save_buffer()
+
+    # We expect the following properties:
+    # 1. We added a task (for Todoist, this is an 'item_add' event).
+    # 2. The task has content `Task 10`.
+    # 3. It is located within the `Project 1` (which has id "1").
+
+    assert isinstance(plugin.todoist.api.queue, list)
+    assert len(plugin.todoist.api.queue) == 1
+
+    item = plugin.todoist.api.queue[0]
+    assert isinstance(item, dict)
+
+    assert item["type"] == "item_add"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["content"] == "Task 10"
+    assert item["args"]["project_id"] == "1"

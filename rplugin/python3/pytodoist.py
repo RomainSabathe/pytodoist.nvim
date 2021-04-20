@@ -581,6 +581,8 @@ class TodoistInterface:
             kwargs["date_completed"] = None
         if "child_order" not in kwargs.keys():
             kwargs["child_order"] = 99  # TODO: dirty.
+        if "parent_id" not in kwargs.keys():
+            kwargs["parent_id"] = None
         return self.api.items.add(*args, **kwargs)
 
     def commit(self):
@@ -713,7 +715,14 @@ class ParsedBuffer:
             for i, (item_before, item_after) in enumerate(zip(befores, afters)):
                 if item_before is None or diff_segment.action_type == "a":
                     project = self._get_project_at_line(from_index + i)
-                    self.todoist.add_task(content=item_after, project_id=project.id)
+                    # TODO: this is the 3rd time we are using this regex.
+                    # There must be a better way.
+                    pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
+                    match_results = re.match(pattern, item_after)
+                    status = match_results.group("status")
+                    content = match_results.group("content")
+                    if status is None or status == " ":
+                        self.todoist.add_task(content=content, project_id=project.id)
                 elif item_after is None or diff_segment.action_type == "d":
                     if isinstance(item_before, Task):
                         # TODO: Is it always a deletion? Can it be a completion?

@@ -40,12 +40,16 @@ def todoist_api():
     api.sync()
     return api
 
+
 class FakeItems(todoist.managers.items.ItemsManager):
     def complete(self, id, date_completed):
         pass
 
+
 class FakeApi(todoist.api.TodoistAPI):
     def __init__(self):
+        self.queue = []
+
         self.state = dict()
         self.state["projects"] = [self._project_factory(i) for i in range(1, 4)]
         self.state["items"] = [
@@ -67,8 +71,16 @@ class FakeApi(todoist.api.TodoistAPI):
         self.state["items"][7]["parent_id"] = "6"
         self.state["items"][7]["child_order"] = 1
 
-    def sync(self):
-        pass
+    def sync(self, commands=None):
+        return commands
+
+    def commit(self, raise_on_error=True):
+        # Similar to the original implementation of `commit`, except that we take
+        # care not to delete the queue.
+        if len(self.queue) == 0:
+            return
+        ret = self.sync(commands=self.queue)
+        return ret
 
     @property
     def items(self):
