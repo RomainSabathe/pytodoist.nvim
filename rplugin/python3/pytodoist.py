@@ -83,6 +83,26 @@ class Plugin(object):
 
     def _refresh_parsed_buffer(self):
         self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._force_formatting()
+
+    def _force_formatting(self):
+        for i, (line, item) in enumerate(
+            zip(self.nvim.current.buffer[:], self.parsed_buffer)
+        ):
+            if isinstance(item, Task):
+                # TODO: we're introducing code duplication here.
+                pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
+                match_results = re.match(pattern, line)
+                # Note that `match_results` will always match, since we match
+                # at least ".*".
+                if match_results.group("status") is None:
+                    # Matches a text like "A task" (without the prefix).
+                    # This likely happens when the user is inserting multiple
+                    # tasks in a row without pressing "<esc>o" between each entry.
+                    # In this case we have to edit the buffer to add the
+                    # necessary prefix.
+                    content = match_results.group("content")
+                    self.nvim.current.buffer[i] = f"[ ] {content}"
 
     def _input_project_from_fzf(self) -> str:
         projects = [project.name for project in self.todoist.projects]
@@ -618,13 +638,16 @@ class ParsedBuffer:
                 # [ ] A task
                 # [x] A task
                 # [X] A task
-                pattern = r"^\[(?P<status>x|X| )\] (?P<content>.*)$"
+                # A task
+                pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
                 match_results = re.match(pattern, line)
-                if match_results is None:
-                    raise NotImplementedError
+                # Note that `match_results` will always match, since we match
+                # at least ".*".
+                content = match_results.group("content")
+                status = match_results.group("status")
                 item = Task(
-                    content=match_results.group("content"),
-                    is_complete=match_results.group("status") in ["x", "X"],
+                    content=content,
+                    is_complete=status in ["x", "X"],
                 )
 
             items.append(item)

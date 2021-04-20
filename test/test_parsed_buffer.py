@@ -488,3 +488,83 @@ def test_parsed_buffer_with_complete_tasks(vim, plugin):
     assert isinstance(plugin.parsed_buffer[2], Task)
     assert plugin.parsed_buffer[2].content == "Task 1"
     assert not plugin.parsed_buffer[2].is_complete
+
+def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Placing the cursor at `[ ] Task 2`.
+    vim.command("call setpos('.', [1, 4, 1, 0])")
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 2"
+
+    # Inserting two new tasks below.
+    # The first task will automatically have the prefix `[ ]` thanks to the remapping
+    # of `o`.
+    # The other task, however, is created without using `o`.
+    vim.command("normal oThis is a new task\nThis is another task")
+
+    plugin._refresh_parsed_buffer()
+
+    # The prefix `[ ]` has been automatically added.
+    assert (
+        vim.current.buffer[plugin._get_current_line_index() - 1]
+        == "[ ] This is another task"
+    )
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] This is a new task",
+        "[ ] This is another task",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+    ]
+
+    # We also check that manually writing '[ ]' doesn't cause it to appear
+    # twice (coming from the user and coming from the script).
+    vim.command("normal oTask 10\n[ ] Task 11")
+
+    plugin._refresh_parsed_buffer()
+
+    assert (
+        vim.current.buffer[plugin._get_current_line_index() - 1]
+        == "[ ] Task 11"
+    )
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] This is a new task",
+        "[ ] This is another task",
+        "[ ] Task 10",
+        "[ ] Task 11",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+    ]
