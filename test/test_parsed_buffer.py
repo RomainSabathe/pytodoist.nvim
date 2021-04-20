@@ -388,3 +388,72 @@ def test_parsed_buffer_2(plugin, vim):
     assert isinstance(plugin.parsed_buffer[3], Task)
     assert plugin.parsed_buffer[3].content == "Task 2"
     assert plugin.parsed_buffer[3].id == "2"
+
+
+def test_adding_new_tasks_with_o_adds_a_prefix(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Placing the cursor at `[ ] Task 2`.
+    vim.command("call setpos('.', [1, 4, 1, 0])")
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 2"
+
+    # Inserting a new task below.
+    vim.command("normal oThis is a new task")
+
+    # The prefix `[ ]` has been automatically added.
+    assert (
+        vim.current.buffer[plugin._get_current_line_index() - 1]
+        == "[ ] This is a new task"
+    )
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] This is a new task",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+    ]
+
+    # Now placing the cursor at `[ ] Task 8`
+    vim.command("call setpos('.', [1, 17, 1, 0])")
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 8"
+
+    # Inserting a task above.
+    vim.command("normal OThis is another task")
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] This is a new task",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] This is another task",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+    ]

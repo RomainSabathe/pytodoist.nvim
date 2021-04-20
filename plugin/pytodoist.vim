@@ -16,6 +16,9 @@ nnoremap <silent> <leader>T :call LoadTasks()<CR>
 ":autocmd FileType todoist nnoremap <buffer><silent> << :call UnmakeChild()<CR>
 ":autocmd FileType todoist vnoremap <buffer><silent> d :call DeleteTask()<CR>
 
+:autocmd FileType todoist nnoremap <buffer><silent> o :normal! o[ ]  <esc>i<kDel>
+:autocmd FileType todoist nnoremap <buffer><silent> O :normal! O[ ]  <esc>i<kDel>
+
 ":highlight MyGroup ctermbg=green guibg=green
 ":let m = matchadd("MyGroup", "something")
 
