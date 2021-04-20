@@ -36,17 +36,17 @@ class Plugin(object):
 
     @pynvim.autocmd("TextYankPost", pattern=".todoist", sync=False)
     def text_yank_post(self):
-        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_parsed_buffer()
         self._refresh_highlights()
 
     @pynvim.autocmd("InsertLeave", pattern=".todoist", sync=False)
     def insert_leave(self):
-        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_parsed_buffer()
         self._refresh_highlights()
 
     @pynvim.autocmd("TextChanged", pattern=".todoist", sync=False)
     def text_changed(self):
-        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_parsed_buffer()
         self._refresh_highlights()
 
     @pynvim.function("CompleteTask")
@@ -72,7 +72,7 @@ class Plugin(object):
         self.parsed_buffer_since_last_save = ParsedBuffer(
             self._get_buffer_content(), self.todoist
         )
-        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_parsed_buffer()
         self._setup_highlight_groups()
         self._refresh_highlights()
         # self.load_tasks(None)
@@ -80,6 +80,9 @@ class Plugin(object):
     @pynvim.autocmd("InsertLeave", pattern=".todoist", sync=True)
     def register_updated_line(self):
         pass
+
+    def _refresh_parsed_buffer(self):
+        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
 
     def _input_project_from_fzf(self) -> str:
         projects = [project.name for project in self.todoist.projects]
@@ -254,6 +257,13 @@ class Plugin(object):
                 self.nvim.api.command(
                     f"highlight {group_name} " f"gui=NONE " f"guifg={item.rgbcolor}"
                 )
+                # Adding a specific case for when the task is completed.
+                group_name = f"TasksComplete{sanitize_str(item.name)}"
+                self.nvim.api.command(
+                    f"highlight {group_name} "
+                    f"cterm=strikethrough gui=strikethrough "
+                    f"guifg={item.rgbcolor}"
+                )
 
     def _refresh_highlights(self):
         highlight_group, highlight_group_suffix = None, None
@@ -266,6 +276,8 @@ class Plugin(object):
 
             if isinstance(item, (Project, ProjectUnderline)):
                 highlight_group = f"Project{highlight_group_suffix}"
+            elif isinstance(item, Task) and item.is_complete:
+                highlight_group = f"TasksComplete{highlight_group_suffix}"
             else:
                 highlight_group = f"Tasks{highlight_group_suffix}"
             self.nvim.current.buffer.add_highlight(highlight_group, i, 0, -1)
@@ -347,6 +359,7 @@ class Task:
     def __init__(
         self,
         content: str = None,
+        is_complete: bool = False,
         data: todoist.models.Item = None,
         children: List["Project"] = None,
     ):
@@ -354,6 +367,7 @@ class Task:
         self.content = content
         self.data = data
         self.depth = 0
+        self.is_complete = is_complete
         if children is None:
             self.children = []
 
@@ -388,7 +402,8 @@ class Task:
         buffer = ""
         for _ in range(self.depth):
             buffer += "    "
-        buffer += f"[ ] {self.content}"
+        buffer += "[ ] " if not self.is_complete else "[X] "
+        buffer += self.content
         return buffer
 
     def __hash__(self):
@@ -603,11 +618,14 @@ class ParsedBuffer:
                 # [ ] A task
                 # [x] A task
                 # [X] A task
-                pattern = r"^\[(x|X| )\] (?P<content>.*)$"
+                pattern = r"^\[(?P<status>x|X| )\] (?P<content>.*)$"
                 match_results = re.match(pattern, line)
                 if match_results is None:
                     raise NotImplementedError
-                item = Task(content=match_results.group("content"))
+                item = Task(
+                    content=match_results.group("content"),
+                    is_complete=match_results.group("status") in ["x", "X"],
+                )
 
             items.append(item)
             k += 1
@@ -622,7 +640,9 @@ class ParsedBuffer:
             elif isinstance(item, Task):
                 task = self.todoist.get_task_by_content(item.content)
                 if task is not None:
+                    task_in_buffer_is_marked_as_complete = self.items[i].is_complete
                     self.items[i] = task
+                    self.items[i].is_complete = task_in_buffer_is_marked_as_complete
 
     def __iter__(self):
         yield from self.items

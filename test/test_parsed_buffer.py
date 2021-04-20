@@ -457,3 +457,34 @@ def test_adding_new_tasks_with_o_adds_a_prefix(plugin, vim):
         "[ ] Task 9",
         "",
     ]
+
+def test_parsed_buffer_with_complete_tasks(vim, plugin):
+    plugin.load_tasks(args=[])
+
+    assert isinstance(plugin.parsed_buffer[2], Task)
+    assert plugin.parsed_buffer[2].content == "Task 1"
+    assert not plugin.parsed_buffer[2].is_complete
+
+    # We fictionaly complete `Task 1` with X.
+    vim.current.buffer[2] = "[X] Task 1"
+
+    plugin._refresh_parsed_buffer()
+    assert isinstance(plugin.parsed_buffer[2], Task)
+    assert plugin.parsed_buffer[2].content == "Task 1"
+    assert plugin.parsed_buffer[2].is_complete
+
+    # We fictionaly complete `Task 3` with x.
+    vim.current.buffer[4] = "[x] Task 3"
+
+    plugin._refresh_parsed_buffer()
+    assert isinstance(plugin.parsed_buffer[4], Task)
+    assert plugin.parsed_buffer[4].content == "Task 3"
+    assert plugin.parsed_buffer[4].is_complete
+
+    # Un-doing the task completion for `Task 1`.
+    vim.current.buffer[2] = "[ ] Task 1"
+
+    plugin._refresh_parsed_buffer()
+    assert isinstance(plugin.parsed_buffer[2], Task)
+    assert plugin.parsed_buffer[2].content == "Task 1"
+    assert not plugin.parsed_buffer[2].is_complete
