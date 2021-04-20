@@ -732,6 +732,9 @@ class ParsedBuffer:
 
             for i, (item_before, item_after) in enumerate(zip(befores, afters)):
                 if item_before is None or diff_segment.action_type == "a":
+                    if item_after == "":
+                        # We prevent from adding an empty task
+                        continue
                     project = self._get_project_at_line(from_index + i)
                     new_task = Task.parse(item_after)
                     if not new_task.is_complete:
