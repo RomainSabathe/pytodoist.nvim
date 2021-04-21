@@ -90,19 +90,16 @@ class Plugin(object):
             zip(self.nvim.current.buffer[:], self.parsed_buffer)
         ):
             if isinstance(item, Task):
-                # TODO: we're introducing code duplication here.
-                pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
-                match_results = re.match(pattern, line)
-                # Note that `match_results` will always match, since we match
-                # at least ".*".
-                if match_results.group("status") is None:
-                    # Matches a text like "A task" (without the prefix).
-                    # This likely happens when the user is inserting multiple
-                    # tasks in a row without pressing "<esc>o" between each entry.
-                    # In this case we have to edit the buffer to add the
-                    # necessary prefix.
-                    content = match_results.group("content")
-                    self.nvim.current.buffer[i] = f"[ ] {content}"
+                # The `line` can sometimes be ill-formed, like `Task 10` instead of
+                # `[ ] Task 10`.
+                # This likely happens when the user is inserting multiple
+                # tasks in a row without pressing "<esc>o" between each entry.
+                # Re-parsing the task and re-printing it (if needed) will enforce that
+                # we always have properly formated tasks.
+                task = Task.parse(line)
+                if str(task) != line:
+                    # Reprinting if necessary. This shouldn't affect many lines.
+                    self.nvim.current.buffer[i] = str(task)
 
     def _input_project_from_fzf(self) -> str:
         projects = [project.name for project in self.todoist.projects]
@@ -394,6 +391,21 @@ class Task:
         if data is not None and content is None:
             self.content = data["content"]
 
+    @abstractmethod
+    def parse(line: str) -> "Task":
+        # A task is formed as one of these  possibilities:
+        # [ ] A task
+        # [x] A task
+        # [X] A task
+        # A task
+        pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
+        match_results = re.match(pattern, line)
+
+        status = match_results.group("status")
+        content = match_results.group("content")
+
+        return Task(content=content, is_complete=status in ["x", "X"])
+
     @property
     def id(self):
         if self.data is not None:
@@ -633,25 +645,7 @@ class ParsedBuffer:
                 continue
 
             # The remaining possibilities are: a proper task or a ProjectSeparator.
-            if line == "":
-                item = ProjectSeparator()
-            else:
-                # A task is formed as one of these  possibilities:
-                # [ ] A task
-                # [x] A task
-                # [X] A task
-                # A task
-                pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
-                match_results = re.match(pattern, line)
-                # Note that `match_results` will always match, since we match
-                # at least ".*".
-                content = match_results.group("content")
-                status = match_results.group("status")
-                item = Task(
-                    content=content,
-                    is_complete=status in ["x", "X"],
-                )
-
+            item = Task.parse(line) if line != "" else ProjectSeparator()
             items.append(item)
             k += 1
         return items
@@ -713,14 +707,11 @@ class ParsedBuffer:
             for i, (item_before, item_after) in enumerate(zip(befores, afters)):
                 if item_before is None or diff_segment.action_type == "a":
                     project = self._get_project_at_line(from_index + i)
-                    # TODO: this is the 3rd time we are using this regex.
-                    # There must be a better way.
-                    pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
-                    match_results = re.match(pattern, item_after)
-                    status = match_results.group("status")
-                    content = match_results.group("content")
-                    if status is None or status == " ":
-                        self.todoist.add_task(content=content, project_id=project.id)
+                    new_task = Task.parse(item_after)
+                    if not new_task.is_complete:
+                        self.todoist.add_task(
+                            content=new_task.content, project_id=project.id
+                        )
                 elif item_after is None or diff_segment.action_type == "d":
                     if isinstance(item_before, Task):
                         # TODO: Is it always a deletion? Can it be a completion?
@@ -730,12 +721,11 @@ class ParsedBuffer:
                             item_before.delete(impact_remote=True)
                 else:
                     if isinstance(item_before, Task):
-                        pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
-                        match_results = re.match(pattern, item_after)
-                        status = match_results.group("status")
-                        content = match_results.group("content")
-                        # TODO: do something based on the status.
-                        item_before.update(content=content)
+                        new_task = Task.parse(item_after)
+                        if not new_task.is_complete:
+                            item_before.update(content=new_task.content)
+                        else:
+                            item_before.complete(impact_remote=True)
                     elif isinstance(item_before, Project):
                         item_before.update(name=item_after)
 
