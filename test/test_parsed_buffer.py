@@ -458,6 +458,7 @@ def test_adding_new_tasks_with_o_adds_a_prefix(plugin, vim):
         "",
     ]
 
+
 def test_parsed_buffer_with_complete_tasks(vim, plugin):
     plugin.load_tasks(args=[])
 
@@ -488,6 +489,7 @@ def test_parsed_buffer_with_complete_tasks(vim, plugin):
     assert isinstance(plugin.parsed_buffer[2], Task)
     assert plugin.parsed_buffer[2].content == "Task 1"
     assert not plugin.parsed_buffer[2].is_complete
+
 
 def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
     plugin.load_tasks(args=[])
@@ -539,10 +541,7 @@ def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
 
     plugin._refresh_parsed_buffer()
 
-    assert (
-        vim.current.buffer[plugin._get_current_line_index() - 1]
-        == "[ ] Task 11"
-    )
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 11"
 
     assert vim.current.buffer[:] == [
         "Project 1",
@@ -568,6 +567,7 @@ def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
         "[ ] Task 9",
         "",
     ]
+
 
 def test_add_task(plugin, vim):
     plugin.load_tasks(args=[])
@@ -595,6 +595,7 @@ def test_add_task(plugin, vim):
     assert item["args"]["project_id"] == "1"
     assert item["args"]["child_order"] == 99
 
+
 def test_delete_task(plugin, vim):
     plugin.load_tasks(args=[])
 
@@ -613,6 +614,7 @@ def test_delete_task(plugin, vim):
     assert item["type"] == "item_delete"
     assert isinstance(item["args"], dict)
     assert item["args"]["id"] == "2"
+
 
 def test_edit_task(plugin, vim):
     plugin.load_tasks(args=[])
@@ -636,3 +638,97 @@ def test_edit_task(plugin, vim):
     assert isinstance(item["args"], dict)
     assert item["args"]["id"] == "2"
     assert item["args"]["content"] == "Task 10"
+
+
+def test_complete_task(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Placing the cursor at `[ ] Task 2`.
+    vim.command("call setpos('.', [1, 4, 1, 0])")
+    # We call for a task completion.
+    plugin.complete_task(args=[])
+
+    plugin._refresh_parsed_buffer()
+
+    # The `Task 2` line should have disappeared, and we should be placed on
+    # `Task 3`.
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 3"
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+    ]
+
+    # We also want to check that manually inserting a "x" or "X" in the task
+    # brackets (`[ ]`) has the effect of completing the task.
+    # We place ourselves on `Task 8`.
+    vim.command("call setpos('.', [1, 15, 1, 0])")
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 8"
+    # We complete the task by editing the buffer.
+    vim.current.buffer[plugin._get_current_line_index() - 1] = "[X] Task 8"
+    # After an edit, the program automatically refreshes the buffer.
+    plugin._refresh_parsed_buffer()
+
+    # Verifying that the fresh of the buffer didn't move the X somehow.
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[X] Task 8"
+
+    # Now let's save the buffer and verify that the program correctly
+    # register the task completion requests.
+    plugin.save_buffer()
+
+    assert isinstance(plugin.todoist.api.queue, list)
+    assert len(plugin.todoist.api.queue) == 2
+
+    # First item to be completed is `Task 8` with id "8". (Recall that the
+    # diff engine gives the diff from bottom to top).
+    item = plugin.todoist.api.queue[0]
+    assert isinstance(item, dict)
+
+    assert item["type"] == "item_complete"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["id"] == "8"
+
+    # Second item to be completed is `Task 2` with id "2".
+    item = plugin.todoist.api.queue[1]
+    assert isinstance(item, dict)
+
+    assert item["type"] == "item_complete"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["id"] == "2"
+
+    raise Exception
+
+    # Lastly, when reloading the tasks, the `Task 8` should have disappeared
+    # since it is now completed.
+    # assert vim.current.buffer[:] == [
+    #     "Project 1",
+    #     "=========",
+    #     "[ ] Task 1",
+    #     "[ ] Task 3",
+    #     "",
+    #     "Project 2",
+    #     "=========",
+    #     "[ ] Task 4",
+    #     "[ ] Task 5",
+    #     "[ ] Task 6",
+    #     "",
+    #     "Project 3",
+    #     "=========",
+    #     "[ ] Task 7",
+    #     "[ ] Task 9",
+    #     "",
+    # ]

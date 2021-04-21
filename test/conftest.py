@@ -41,9 +41,8 @@ def todoist_api():
     return api
 
 
-class FakeItems(todoist.managers.items.ItemsManager):
-    def complete(self, id, date_completed):
-        pass
+class FakeItemsManager(todoist.managers.items.ItemsManager):
+    pass
 
 
 class FakeApi(todoist.api.TodoistAPI):
@@ -84,7 +83,7 @@ class FakeApi(todoist.api.TodoistAPI):
 
     @property
     def items(self):
-        return FakeItems(api=self)
+        return FakeItemsManager(api=self)
 
     def _task_factory(self, task_id: int, project_id: int):
         return todoist.models.Item(

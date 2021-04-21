@@ -472,6 +472,7 @@ class Task:
         if impact_remote:
             self.data.complete()
         self.content = "[Completed]"
+        self.is_complete = True
 
     def delete(self, impact_remote: bool = True):
         if impact_remote:
@@ -660,6 +661,7 @@ class ParsedBuffer:
                 task = self.todoist.get_task_by_content(item.content)
                 if task is not None:
                     task_in_buffer_is_marked_as_complete = self.items[i].is_complete
+                    # self.items[i] = copy(task)
                     self.items[i] = task
                     self.items[i].is_complete = task_in_buffer_is_marked_as_complete
 
@@ -714,7 +716,6 @@ class ParsedBuffer:
                         )
                 elif item_after is None or diff_segment.action_type == "d":
                     if isinstance(item_before, Task):
-                        # TODO: Is it always a deletion? Can it be a completion?
                         if item_before.content == "[Completed]":
                             item_before.complete(impact_remote=True)
                         else:
@@ -844,13 +845,7 @@ class DiffSegment:
             self.to_index: int = self.from_index + 1
 
     def __getitem__(self, i: int):
-        try:
-            return self.modified_lines[i]
-        except:
-            import ipdb
-
-            ipdb.set_trace()
-            pass
+        return self.modified_lines[i]
 
     def __len__(self):
         return len(self.modified_lines)
