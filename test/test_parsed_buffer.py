@@ -593,3 +593,4 @@ def test_add_task(plugin, vim):
     assert isinstance(item["args"], dict)
     assert item["args"]["content"] == "Task 10"
     assert item["args"]["project_id"] == "1"
+    assert item["args"]["child_order"] == 99
