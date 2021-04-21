@@ -688,8 +688,6 @@ class ParsedBuffer:
     def compare_with(self, other):
         diff = Diff(self, other)
 
-        print("\n".join(diff.raw_diff))
-
         for diff_segment in diff:
             # We apply `-1` because the indices returned by the Diff engine are relative
             # to a text buffer which starts indexing at 1.
@@ -732,7 +730,12 @@ class ParsedBuffer:
                             item_before.delete(impact_remote=True)
                 else:
                     if isinstance(item_before, Task):
-                        item_before.update(content=item_after)
+                        pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
+                        match_results = re.match(pattern, item_after)
+                        status = match_results.group("status")
+                        content = match_results.group("content")
+                        # TODO: do something based on the status.
+                        item_before.update(content=content)
                     elif isinstance(item_before, Project):
                         item_before.update(name=item_after)
 

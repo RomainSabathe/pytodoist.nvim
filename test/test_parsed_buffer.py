@@ -594,3 +594,45 @@ def test_add_task(plugin, vim):
     assert item["args"]["content"] == "Task 10"
     assert item["args"]["project_id"] == "1"
     assert item["args"]["child_order"] == 99
+
+def test_delete_task(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Placing the cursor at `[ ] Task 2`.
+    # We delete this task.
+    vim.command("call setpos('.', [1, 4, 1, 0])")
+    vim.command("normal dd")
+    plugin.save_buffer()
+
+    assert isinstance(plugin.todoist.api.queue, list)
+    assert len(plugin.todoist.api.queue) == 1
+
+    item = plugin.todoist.api.queue[0]
+    assert isinstance(item, dict)
+
+    assert item["type"] == "item_delete"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["id"] == "2"
+
+def test_edit_task(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Placing the cursor at `[ ] Task 2`.
+    # We replace this task with "Task 10"
+    vim.command("call setpos('.', [1, 4, 1, 0])")
+    vim.command("normal ccTask 10")
+    plugin.save_buffer()
+
+    # The prefix [ ] should have been added.
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 10"
+
+    assert isinstance(plugin.todoist.api.queue, list)
+    assert len(plugin.todoist.api.queue) == 1
+
+    item = plugin.todoist.api.queue[0]
+    assert isinstance(item, dict)
+
+    assert item["type"] == "item_update"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["id"] == "2"
+    assert item["args"]["content"] == "Task 10"
