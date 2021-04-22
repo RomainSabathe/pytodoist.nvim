@@ -105,10 +105,10 @@ class Plugin(object):
         # This command instantiates a global vimscript variable named `fzf_output`.
         self.nvim.api.command("call ResetFzfOutput()")
         self.nvim.api.command(
-            "call fzf#run({"
+            "call fzf#run(fzf#wrap({"
             "'sink': function('CaptureFzfOutput'),"
             f"'source': {source}"
-            "})"
+            "}))"
         )
         # However fzf#run returns directly (it doesn't wait for the user to complete
         # its input).
