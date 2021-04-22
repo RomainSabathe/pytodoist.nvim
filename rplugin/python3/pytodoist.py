@@ -101,15 +101,13 @@ class Plugin(object):
                     # Reprinting if necessary. This shouldn't affect many lines.
                     self.nvim.current.buffer[i] = str(task)
 
-    def _input_project_from_fzf(self) -> str:
-        projects = [project.name for project in self.todoist.projects]
-
+    def _input_from_fzf(self, source: List[str]) -> str:
         # This command instantiates a global vimscript variable named `fzf_output`.
         self.nvim.api.command("call ResetFzfOutput()")
         self.nvim.api.command(
             "call fzf#run({"
             "'sink': function('CaptureFzfOutput'),"
-            f"'source': {projects}"
+            f"'source': {source}"
             "})"
         )
         # However fzf#run returns directly (it doesn't wait for the user to complete
@@ -128,7 +126,8 @@ class Plugin(object):
     def move_task(self, args, _range):
         if len(args) == 0:
             self.nvim.api.command("set modifiable")
-            project_name = self._input_project_from_fzf()
+            projects = [project.name for project in self.todoist.projects]
+            project_name = self._input_from_fzf(source=projects)
         else:
             project_name = args[0]
         if project_name == "":
@@ -174,6 +173,34 @@ class Plugin(object):
             ")"
         )
 
+    @pynvim.function("AssignLabel", sync=False, range=False)
+    def assign_label(self, args):
+        if len(args) == 0:
+            self.nvim.api.command("set modifiable")
+            # TODO: create a Label wrapper class?
+            labels = [label["name"] for label in self.todoist.api.state["labels"]]
+            label_name = self._input_from_fzf(source=labels)
+        else:
+            label_name = args[0]
+        if label_name == "":
+            return
+
+        # Getting the task at the current cursor position.
+        line_index = self._get_current_line_index()
+        task = self.parsed_buffer[line_index - 1]
+
+        # Getting the label we want to assign (we need its id).
+        label = self.todoist.get_label_by_name(label_name)
+
+        # Getting the list of current labels (we want to append to that list).
+        current_labels = task.data["labels"]
+
+        task.update(labels=[label["id"], *current_labels])
+        self.nvim.command(f"echo 'Task registered with label: {label['name']}.'")
+
+        # # TODO: still unsure if we want to do this...
+        # # item.move(project_id=project.id)
+
     @pynvim.function("TodoistCleanup", sync=True)
     def todoist_cleanup(self, args):
         """Delete the tasks that are empty."""
@@ -183,15 +210,6 @@ class Plugin(object):
                 task.delete()
         self.todoist.commit()
         self.load_tasks([])
-
-    @pynvim.function("TempMarkThisWeek", sync=True)
-    def tmp_mark_this_week(self, args):
-        line_index = self._get_current_line_index()
-        task = self.parsed_buffer[line_index - 1]
-        current_labels = task.data["labels"]
-        new_labels = [2156631975, *current_labels]
-        task.data.update(labels=new_labels)
-        self.todoist.commit()
 
     @pynvim.function("LoadTasks", sync=True)
     def load_tasks(self, args):
@@ -543,6 +561,12 @@ class TodoistInterface:
         for task in self.tasks:
             if content == task.content:
                 return task
+        return None
+
+    def get_label_by_name(self, name):
+        for label in self.api.state["labels"]:
+            if name == label["name"]:
+                return label
         return None
 
     def iterprojects(self, root: Project = None):

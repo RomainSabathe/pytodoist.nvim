@@ -56,6 +56,7 @@ class FakeApi(todoist.api.TodoistAPI):
             *[self._task_factory(i, project_id=2) for i in range(4, 7)],
             *[self._task_factory(i, project_id=3) for i in range(7, 10)],
         ]
+        self.state["labels"] = [self._label_factory(i) for i in range(1, 4)]
 
         # In order to test that the projects get displayed in the correct order, we
         # alter the natural ordering.
@@ -90,13 +91,14 @@ class FakeApi(todoist.api.TodoistAPI):
             api=self,
             data={
                 "content": f"Task {task_id}",
-                "project_id": f"{project_id}",
+                "project_id": str(project_id),
                 "id": str(task_id),
                 "is_deleted": 0,
                 "in_history": 0,
                 "date_completed": None,
                 "child_order": (task_id - 1) % 3,
                 "parent_id": None,
+                "labels": [],
             },
         )
 
@@ -105,12 +107,24 @@ class FakeApi(todoist.api.TodoistAPI):
             api=self,
             data={
                 "name": f"Project {project_id}",
-                "id": f"{project_id}",
+                "id": str(project_id),
                 "is_archived": 0,
                 "is_deleted": 0,
                 "color": project_id + 30,
                 "parent_id": None,
                 "child_order": project_id,
+            },
+        )
+
+    def _label_factory(self, label_id: int):
+        return todoist.models.Label(
+            api=self,
+            data={
+                "name": f"Label {label_id}",
+                "id": str(label_id),
+                "item_order": label_id,
+                "is_deleted": 0,
+                "is_favorite": 0,
             },
         )
 
