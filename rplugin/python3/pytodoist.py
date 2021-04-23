@@ -6,7 +6,7 @@ from collections import deque
 from abc import abstractmethod
 from copy import copy, deepcopy
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 
 import pynvim
 import todoist
@@ -224,7 +224,17 @@ class Plugin(object):
 
         # Actually writing the tasks.
         self.todoist.sync()
-        self.nvim.current.buffer[:] = [str(item) for item in self.todoist]
+        self.nvim.current.buffer[:] = [str(item) for item in self.todoist] + (
+            [
+                str(item)
+                for item in CustomSection(
+                    "Custom Section",
+                    lambda task: "1" in task.data["labels"],
+                ).iter_over(self.todoist)
+            ]
+            if len(args) >= 1 and args[0]
+            else []
+        )
 
         # Restoring the cursor position.
         # We need to be mindful of the case where there were changes on the Todoist
@@ -499,6 +509,21 @@ class Task:
 
     def move(self, *args, **kwargs):
         return self.data.move(*args, **kwargs)
+
+
+class CustomSection:
+    def __init__(self, name: str, filter_fn: Callable[[Task], bool]):
+        self.name = name
+        self.filter_fn = filter_fn
+
+    def iter_over(self, task_list):
+        yield self.name
+        yield "-" * len(self.name)
+        for item in task_list:
+            if not isinstance(item, Task):
+                continue
+            if self.filter_fn(item):
+                yield item
 
 
 class ProjectUnderline:

@@ -58,6 +58,11 @@ class FakeApi(todoist.api.TodoistAPI):
         ]
         self.state["labels"] = [self._label_factory(i) for i in range(1, 4)]
 
+        # Assigning Tasks 1, 4 and 7 with label `1`.
+        self.state["items"][0]["labels"] = ["1"]
+        self.state["items"][3]["labels"] = ["1"]
+        self.state["items"][6]["labels"] = ["1"]
+
         # In order to test that the projects get displayed in the correct order, we
         # alter the natural ordering.
         self.state["projects"] = self.state["projects"][::-1]

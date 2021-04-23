@@ -740,3 +740,32 @@ def test_assign_label(plugin, vim):
     assert isinstance(item["args"], dict)
     assert item["args"]["id"] == "2"
     assert item["args"]["labels"] == ["1"]
+
+def test_display_custom_section(plugin, vim):
+    plugin.load_tasks(args=[True])
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 4",
+        "[ ] Task 7",
+    ]
