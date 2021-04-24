@@ -224,12 +224,21 @@ class Plugin(object):
 
         # Actually writing the tasks.
         self.todoist.sync()
+        label_id = [
+            label["id"]
+            for label in self.todoist.api.state["labels"]
+            if label["name"] == "thisweek"
+        ]
+        if len(label_id) >= 1:
+            label_id = label_id[0]
+        label_id = "1"
         self.nvim.current.buffer[:] = [str(item) for item in self.todoist] + (
             [
                 str(item)
                 for item in CustomSection(
+                    # "This Week",
                     "Custom Section",
-                    lambda task: "1" in task.data["labels"],
+                    lambda task: label_id in task.data["labels"],
                 ).iter_over(self.todoist)
             ]
             if len(args) >= 1 and args[0]
@@ -252,7 +261,7 @@ class Plugin(object):
         self.parsed_buffer_since_last_save = ParsedBuffer(
             self._get_buffer_content(), self.todoist
         )
-        self.parsed_buffer = ParsedBuffer(self._get_buffer_content(), self.todoist)
+        self._refresh_parsed_buffer()
         self._setup_highlight_groups()
         self._refresh_highlights()
 
@@ -518,12 +527,23 @@ class CustomSection:
 
     def iter_over(self, task_list):
         yield self.name
-        yield "-" * len(self.name)
+        yield SectionUnderline(self.name)
         for item in task_list:
             if not isinstance(item, Task):
                 continue
             if self.filter_fn(item):
                 yield item
+
+
+class SectionUnderline:
+    def __init__(self, section_name: str):
+        self.project_name = section_name
+
+    def __repr__(self):
+        return "SectionUnderline"
+
+    def __str__(self):
+        return "-" * len(self.project_name)
 
 
 class ProjectUnderline:
@@ -679,7 +699,8 @@ class ParsedBuffer:
         while k < len(self._raw_lines):
             line = self._raw_lines[k]
 
-            # Look ahead: checking if the current line is actually a project.
+            # Look ahead: checking if the current line is actually a project or a
+            # custom section.
             potential_project_name = line
             potential_underline = ProjectUnderline(potential_project_name)
             if (
@@ -690,6 +711,20 @@ class ParsedBuffer:
                 # We are indeed scanning a project name. We register this info
                 # and move on.
                 items.append(Project(name=potential_project_name))
+                items.append(potential_underline)
+                k += 2
+                continue
+
+            potential_section_name = line
+            potential_underline = SectionUnderline(potential_section_name)
+            if (
+                potential_section_name != ""
+                and k + 1 < len(self._raw_lines)
+                and str(potential_underline) == self._raw_lines[k + 1]
+            ):
+                # We are indeed scanning a section. We register this info
+                # and move on.
+                items.append(CustomSection(name=potential_section_name, filter_fn=None))
                 items.append(potential_underline)
                 k += 2
                 continue
