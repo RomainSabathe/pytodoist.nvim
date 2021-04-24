@@ -665,6 +665,8 @@ class TodoistInterface:
             kwargs["child_order"] = 99  # TODO: dirty.
         if "parent_id" not in kwargs.keys():
             kwargs["parent_id"] = None
+        if "labels" not in kwargs.keys():
+            kwargs["labels"] = []
         return self.api.items.add(*args, **kwargs)
 
     def commit(self):
@@ -755,12 +757,24 @@ class ParsedBuffer:
     def __getitem__(self, i):
         return self.items[i]
 
-    def _get_project_at_line(self, i: int) -> Project:
+    def _get_project_or_section_at_line(self, i: int) -> Union[Project, CustomSection]:
         # We take the first project that we encounter by "moving up" in the document.
         for item in self[:i][::-1]:
-            if isinstance(item, Project):
+            if isinstance(item, (Project, CustomSection)):
                 return item
         raise Exception("Couldn't find project.")
+
+    def _get_inbox_project(self):
+        if self.todoist is None:
+            return None
+        candidates = [
+            project
+            for project in self.todoist.iterprojects()
+            if project.data["inbox_project"]
+        ]
+        assert len(candidates) != 0, "Can't find an Inbox project."
+        assert len(candidates) <= 1, "We found too many inbox projects."
+        return candidates[0]
 
     # TODO: I have to find another name for this.
     # Also: there is a big assumption: `self` should be synced with Todoist (all ids
@@ -795,11 +809,22 @@ class ParsedBuffer:
                     if item_after == "":
                         # We prevent from adding an empty task
                         continue
-                    project = self._get_project_at_line(from_index + i)
                     new_task = Task.parse(item_after)
                     if not new_task.is_complete:
+                        # We wan to create a task. There are two cases:
+                        # - Either the task is created within a project, and we
+                        #   can directly obtain the project_id.
+                        # - Or it was added to a custom section. In which case we
+                        #   can't know what the project_id should be. Therefore we
+                        #   default to Inbox.
+                        parent = self._get_project_or_section_at_line(from_index + i)
+                        project_id = None  # Will be initialized next.
+                        if isinstance(parent, Project):
+                            project_id = parent.id
+                        elif isinstance(parent, CustomSection):
+                            project_id = self._get_inbox_project().id
                         self.todoist.add_task(
-                            content=new_task.content, project_id=project.id
+                            content=new_task.content, project_id=project_id
                         )
                 elif item_after is None or diff_segment.action_type == "d":
                     if isinstance(item_before, Task):

@@ -63,6 +63,9 @@ class FakeApi(todoist.api.TodoistAPI):
         self.state["items"][3]["labels"] = ["1"]
         self.state["items"][6]["labels"] = ["1"]
 
+        # We make Project 1 the inbox project.
+        self.state["projects"][0].data["inbox_project"] = True
+
         # In order to test that the projects get displayed in the correct order, we
         # alter the natural ordering.
         self.state["projects"] = self.state["projects"][::-1]
@@ -75,6 +78,7 @@ class FakeApi(todoist.api.TodoistAPI):
         # Setting `Task 8` as a child of `Task 7`.
         self.state["items"][7]["parent_id"] = "6"
         self.state["items"][7]["child_order"] = 1
+
 
     def sync(self, commands=None):
         return commands
@@ -118,6 +122,7 @@ class FakeApi(todoist.api.TodoistAPI):
                 "color": project_id + 30,
                 "parent_id": None,
                 "child_order": project_id,
+                "inbox_project": False,
             },
         )
 
