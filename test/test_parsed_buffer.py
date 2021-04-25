@@ -778,20 +778,64 @@ def test_add_task_in_custom_section(plugin, vim):
     # We add a new task called `Task 10`.
     vim.command("call setpos('.', [1, 22, 1, 0])")
     vim.command("normal oTask 10")
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 4",
+        "[ ] Task 10",
+        "[ ] Task 7",
+    ]
+
     plugin.save_buffer()
+
+    assert vim.current.buffer[:] == [
+        "Project 1",
+        "=========",
+        "[ ] Task 1",
+        "[ ] Task 2",
+        "[ ] Task 3",
+        "",
+        "Project 2",
+        "=========",
+        "[ ] Task 4",
+        "[ ] Task 5",
+        "[ ] Task 6",
+        "",
+        "Project 3",
+        "=========",
+        "[ ] Task 7",
+        "[ ] Task 8",
+        "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 4",
+        "[ ] Task 10",
+        "[ ] Task 7",
+    ]
+
     plugin.load_tasks(args=[True])
-
-    # assert isinstance(plugin.todoist.api.queue, list)
-    # assert len(plugin.todoist.api.queue) == 1
-
-    # item = plugin.todoist.api.queue[0]
-    # assert isinstance(item, dict)
-
-    # assert item["type"] == "item_add"
-    # assert isinstance(item["args"], dict)
-    # assert item["args"]["content"] == "Task 10"
-    # assert item["args"]["project_id"] == "1"
-    # assert item["args"]["child_order"] == 99
 
     assert vim.current.buffer[:] == [
         "Project 1",
