@@ -23,9 +23,9 @@ class Plugin(object):
             raise ValueError("Can't find the TODOIST_API_KEY env var.")
         self.todoist = TodoistInterface(
             todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY")),
-            custom_sections=CustomSection(
-                "Custom Section", lambda task: "1" in task.labels
-            ),
+            custom_sections=[
+                CustomSection("Custom Section", lambda task: "1" in task.labels)
+            ],
         )
         # self.todoist.sync()
         # label_id = [
@@ -235,6 +235,7 @@ class Plugin(object):
         buf_index, line_index, col_index, offset, _ = self.nvim.api.eval("position")
 
         # Actually writing the tasks.
+        self.todoist.sync()
         self.nvim.current.buffer[:] = [str(item) for item in self.todoist]
 
         # Restoring the cursor position.
