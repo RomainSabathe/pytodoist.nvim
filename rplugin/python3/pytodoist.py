@@ -24,18 +24,10 @@ class Plugin(object):
         self.todoist = TodoistInterface(
             todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY")),
             custom_sections=[
-                CustomSection("Custom Section", lambda task: "1" in task.labels)
+                CustomSection("Today", lambda task: 2156740858 in task.labels),
+                CustomSection("This Week", lambda task: 2156631975 in task.labels),
             ],
         )
-        # self.todoist.sync()
-        # label_id = [
-        #     label["id"]
-        #     for label in self.todoist.api.state["labels"]
-        #     if label["name"] == "thisweek"
-        # ]
-        # if len(label_id) >= 1:
-        #     label_id = label_id[0]
-        # label_id = "1"
         self.parsed_buffer_since_last_save = None
         self.parsed_buffer = None
 
