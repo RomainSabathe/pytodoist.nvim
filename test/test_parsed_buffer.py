@@ -30,6 +30,11 @@ def test_load_tasks(plugin, vim):
         "[ ] Task 8",
         "[ ] Task 9",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
 
@@ -63,6 +68,11 @@ def test_move_task_1(plugin, vim):
         "[ ] Task 7",
         "[ ] Task 8",
         "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
         "",
     ]
 
@@ -102,6 +112,11 @@ def test_move_task_2(plugin, vim):
         "[ ] Task 9",
         "[ ] Task 2",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
     # In addition, the cursor should be on `Task 3`.
@@ -139,6 +154,11 @@ def test_move_task_3(plugin, vim):
         "[ ] Task 7",
         "[ ] Task 8",
         "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
         "",
     ]
 
@@ -178,6 +198,11 @@ def test_move_task_4(plugin, vim):
         "[ ] Task 8",
         "[ ] Task 9",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
     # In addition, the cursor should be on ``.
@@ -216,6 +241,11 @@ def test_move_task_5(plugin, vim):
         "=========",
         "[ ] Task 7",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
     # In addition, the cursor should be on ``.
@@ -249,6 +279,11 @@ def test_complete_tasks(plugin, vim):
         "[ ] Task 7",
         "[ ] Task 8",
         "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
         "",
     ]
 
@@ -288,6 +323,11 @@ def test_load_tasks_when_using_multiple_windows(plugin, vim):
         "[ ] Task 7",
         "[ ] Task 8",
         "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
         "",
     ]
     assert vim.current.buffer.number == 2
@@ -341,6 +381,11 @@ def test_load_tasks_when_using_multiple_windows(plugin, vim):
         "[ ] Task 7",
         "[ ] Task 8",
         "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
         "",
     ]
 
@@ -406,6 +451,11 @@ def test_adding_new_tasks_with_o_adds_a_prefix(plugin, vim):
         "[ ] Task 8",
         "[ ] Task 9",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
     # Now placing the cursor at `[ ] Task 8`
@@ -435,6 +485,11 @@ def test_adding_new_tasks_with_o_adds_a_prefix(plugin, vim):
         "[ ] This is another task",
         "[ ] Task 8",
         "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
         "",
     ]
 
@@ -513,6 +568,11 @@ def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
         "[ ] Task 8",
         "[ ] Task 9",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
     # We also check that manually writing '[ ]' doesn't cause it to appear
@@ -545,6 +605,11 @@ def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
         "[ ] Task 7",
         "[ ] Task 8",
         "[ ] Task 9",
+        "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
         "",
     ]
 
@@ -653,6 +718,11 @@ def test_complete_task(plugin, vim):
         "[ ] Task 8",
         "[ ] Task 9",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
     # We also want to check that manually inserting a "x" or "X" in the task
@@ -711,6 +781,11 @@ def test_complete_task(plugin, vim):
         "[ ] Task 7",
         "[ ] Task 9",
         "",
+        "Custom Section",
+        "--------------",
+        "[ ] Task 1",
+        "[ ] Task 7",
+        "",
     ]
 
 
@@ -766,17 +841,17 @@ def test_display_custom_section(plugin, vim):
         "Custom Section",
         "--------------",
         "[ ] Task 1",
-        "[ ] Task 4",
         "[ ] Task 7",
+        "",
     ]
 
 def test_add_task_in_custom_section(plugin, vim):
     plugin.load_tasks(args=[True])
 
     # Adding a task in a custom section should add it to the Inbox.
-    # Placing the cursor at `[ ] Task 4`.
+    # Placing the cursor at `[ ] Task 1`.
     # We add a new task called `Task 10`.
-    vim.command("call setpos('.', [1, 22, 1, 0])")
+    vim.command("call setpos('.', [1, 21, 1, 0])")
     vim.command("normal oTask 10")
 
     assert vim.current.buffer[:] == [
@@ -801,9 +876,9 @@ def test_add_task_in_custom_section(plugin, vim):
         "Custom Section",
         "--------------",
         "[ ] Task 1",
-        "[ ] Task 4",
         "[ ] Task 10",
         "[ ] Task 7",
+        "",
     ]
 
     plugin.save_buffer()
@@ -830,9 +905,9 @@ def test_add_task_in_custom_section(plugin, vim):
         "Custom Section",
         "--------------",
         "[ ] Task 1",
-        "[ ] Task 4",
         "[ ] Task 10",
         "[ ] Task 7",
+        "",
     ]
 
     plugin.load_tasks(args=[True])
@@ -860,6 +935,6 @@ def test_add_task_in_custom_section(plugin, vim):
         "Custom Section",
         "--------------",
         "[ ] Task 1",
-        "[ ] Task 4",
         "[ ] Task 7",
+        "",
     ]

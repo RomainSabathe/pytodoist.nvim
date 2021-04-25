@@ -5,7 +5,7 @@ import todoist
 import pytest
 import pynvim
 
-from rplugin.python3.pytodoist import TodoistInterface, Plugin
+from rplugin.python3.pytodoist import TodoistInterface, Plugin, CustomSection
 
 pynvim.setup_logging("test")
 
@@ -58,9 +58,8 @@ class FakeApi(todoist.api.TodoistAPI):
         ]
         self.state["labels"] = [self._label_factory(i) for i in range(1, 4)]
 
-        # Assigning Tasks 1, 4 and 7 with label `1`.
+        # Assigning Tasks 1 and 7 with label `1`.
         self.state["items"][0]["labels"] = ["1"]
-        self.state["items"][3]["labels"] = ["1"]
         self.state["items"][6]["labels"] = ["1"]
 
         # We make Project 1 the inbox project.
@@ -78,7 +77,6 @@ class FakeApi(todoist.api.TodoistAPI):
         # Setting `Task 8` as a child of `Task 7`.
         self.state["items"][7]["parent_id"] = "6"
         self.state["items"][7]["child_order"] = 1
-
 
     def sync(self, commands=None):
         return commands
@@ -140,8 +138,15 @@ class FakeApi(todoist.api.TodoistAPI):
 
 
 @pytest.fixture
-def plugin(vim):
+def custom_sections():
+    return [
+        CustomSection(name="Custom Section", filter_fn=lambda task: "1" in task.labels)
+    ]
+
+
+@pytest.fixture
+def plugin(vim, custom_sections):
     to_return = Plugin(vim)
-    to_return.todoist = TodoistInterface(FakeApi())
+    to_return.todoist = TodoistInterface(FakeApi(), custom_sections=custom_sections)
     to_return.todoist.sync()
     return to_return

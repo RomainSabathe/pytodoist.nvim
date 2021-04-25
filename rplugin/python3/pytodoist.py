@@ -22,8 +22,20 @@ class Plugin(object):
         if not os.environ.get("TODOIST_API_KEY"):
             raise ValueError("Can't find the TODOIST_API_KEY env var.")
         self.todoist = TodoistInterface(
-            todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY"))
+            todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY")),
+            custom_sections=CustomSection(
+                "Custom Section", lambda task: "1" in task.labels
+            ),
         )
+        # self.todoist.sync()
+        # label_id = [
+        #     label["id"]
+        #     for label in self.todoist.api.state["labels"]
+        #     if label["name"] == "thisweek"
+        # ]
+        # if len(label_id) >= 1:
+        #     label_id = label_id[0]
+        # label_id = "1"
         self.parsed_buffer_since_last_save = None
         self.parsed_buffer = None
 
@@ -223,27 +235,7 @@ class Plugin(object):
         buf_index, line_index, col_index, offset, _ = self.nvim.api.eval("position")
 
         # Actually writing the tasks.
-        self.todoist.sync()
-        label_id = [
-            label["id"]
-            for label in self.todoist.api.state["labels"]
-            if label["name"] == "thisweek"
-        ]
-        if len(label_id) >= 1:
-            label_id = label_id[0]
-        # label_id = "1"
-        self.nvim.current.buffer[:] = [str(item) for item in self.todoist] + (
-            [
-                str(item)
-                for item in CustomSection(
-                    # "This Week",
-                    "Custom Section",
-                    lambda task: label_id in task.data["labels"],
-                ).iter_over(self.todoist)
-            ]
-            if len(args) >= 1 and args[0]
-            else []
-        )
+        self.nvim.current.buffer[:] = [str(item) for item in self.todoist]
 
         # Restoring the cursor position.
         # We need to be mindful of the case where there were changes on the Todoist
@@ -465,6 +457,12 @@ class Task:
             return self.data["parent_id"] is None
         return True
 
+    @property
+    def labels(self):
+        if self.data is not None:
+            return self.data["labels"]
+        return []
+
     def __repr__(self) -> str:
         short_content = (
             self.content if len(self.content) < 50 else f"{self.content[:47]}..."
@@ -529,14 +527,11 @@ class CustomSection:
         self.name = name
         self.filter_fn = filter_fn
 
-    def iter_over(self, task_list):
-        yield self.name
-        yield SectionUnderline(self.name)
-        for item in task_list:
-            if not isinstance(item, Task):
-                continue
-            if self.filter_fn(item):
-                yield item
+    def __str__(self):
+        return self.name
+
+    def matches(self, task: Task):
+        return self.filter_fn(task)
 
 
 class SectionUnderline:
@@ -562,10 +557,17 @@ class ProjectUnderline:
 
 
 class TodoistInterface:
-    def __init__(self, todoist_api: todoist.api.TodoistAPI):
+    def __init__(
+        self,
+        todoist_api: todoist.api.TodoistAPI,
+        custom_sections: List[CustomSection] = None,
+    ):
         self.api = todoist_api
         self.tasks = None
         self.projects = None
+        if custom_sections is None:
+            custom_sections = []
+        self.custom_sections = custom_sections
 
     def sync(self):
         self.api.sync()
@@ -655,6 +657,22 @@ class TodoistInterface:
             for task in self.itertasks():
                 if task.isin(project) and task.isvalid():
                     yield task
+            yield ProjectSeparator()
+
+        # We display the custom sections last.
+        for custom_section in self.custom_sections:
+            yield custom_section
+            yield SectionUnderline(custom_section.name)
+            # In order to preserve task order, we're forced to iterate over projects
+            # once again.
+            for project in self.iterprojects():
+                for task in self.itertasks():
+                    if (
+                        task.isin(project)
+                        and task.isvalid()
+                        and custom_section.matches(task)
+                    ):
+                        yield task
             yield ProjectSeparator()
 
     def add_task(self, *args, **kwargs):
@@ -751,9 +769,10 @@ class ParsedBuffer:
                 task = self.todoist.get_task_by_content(item.content)
                 if task is not None:
                     task_in_buffer_is_marked_as_complete = self.items[i].is_complete
-                    # self.items[i] = copy(task)
                     self.items[i] = task
                     self.items[i].is_complete = task_in_buffer_is_marked_as_complete
+            elif isinstance(item, CustomSection):
+                break
 
     def __iter__(self):
         yield from self.items
