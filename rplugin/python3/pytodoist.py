@@ -231,7 +231,7 @@ class Plugin(object):
         ]
         if len(label_id) >= 1:
             label_id = label_id[0]
-        label_id = "1"
+        # label_id = "1"
         self.nvim.current.buffer[:] = [str(item) for item in self.todoist] + (
             [
                 str(item)
@@ -380,6 +380,10 @@ class Project:
         if self.data is not None:
             return BG_COLORS_ID_TO_HEX[self.data["color"]]
         return "#ffffff"
+
+    @property
+    def is_inbox(self):
+        return self.data.data.get("inbox_project")
 
     def __str__(self):
         return self.name
@@ -768,9 +772,7 @@ class ParsedBuffer:
         if self.todoist is None:
             return None
         candidates = [
-            project
-            for project in self.todoist.iterprojects()
-            if project.data["inbox_project"]
+            project for project in self.todoist.iterprojects() if project.is_inbox
         ]
         assert len(candidates) != 0, "Can't find an Inbox project."
         assert len(candidates) <= 1, "We found too many inbox projects."
