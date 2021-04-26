@@ -397,12 +397,35 @@ class Project:
         return not (self.data["is_archived"] or self.data["is_deleted"])
 
 
+class Label:
+    def __init__(self, name: str = None, data: todoist.models.Label = None):
+        assert name is not None or data is not None
+        self.content = name
+        self.data = data
+
+        if data is not None and name is None:
+            self.name: str = data["name"]
+
+    def __str__(self):
+        return f"@{self.name}"
+
+    def __repr__(self) -> str:
+        return f"Label #{self.id}: {self.name}"
+
+    @property
+    def id(self):
+        if self.data is not None:
+            return self.data["id"]
+        return "[Not synced]"
+
+
 class Task:
     def __init__(
         self,
         content: str = None,
         is_complete: bool = False,
         data: todoist.models.Item = None,
+        labels: List[Label] = None,
         children: List["Project"] = None,
     ):
         assert content is not None or data is not None
@@ -410,6 +433,7 @@ class Task:
         if data is None:
             data = dict()
         self.data = data
+        self.labels = labels
         self.depth = 0
         self.is_complete = is_complete
         if children is None:
@@ -427,8 +451,13 @@ class Task:
         # A task
         if isinstance(line, Task):
             return line
-        pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
+        checkbox = r"(\[(?P<status>x|X| )\] )?"
+        content = r"(?P<content>.*)"
+        labels = r"(?P<label>@\w+)*"
+        pattern = rf"^{checkbox}{content}( | {labels})?$"
         match_results = re.match(pattern, line)
+        import ipdb; ipdb.set_trace()
+        pass
 
         status = match_results.group("status")
         content = match_results.group("content")
@@ -455,9 +484,15 @@ class Task:
 
     @property
     def labels(self):
+        if not self.__labels is None:
+            return self.__labels
         if isinstance(self.data, todoist.models.Item):
             return self.data["labels"]
         return self.data.get("labels", [])
+
+    @labels.setter
+    def labels(self, labels):
+        self.__labels = labels
 
     def __repr__(self) -> str:
         short_content = (
@@ -471,6 +506,10 @@ class Task:
             buffer += "    "
         buffer += "[ ] " if not self.is_complete else "[X] "
         buffer += self.content
+        if self.labels:
+            buffer += " |"
+            for label in self.labels:
+                buffer += f" {label}"
         return buffer
 
     def __hash__(self):
@@ -567,8 +606,13 @@ class TodoistInterface:
 
     def sync(self):
         self.api.sync()
-        self.tasks = self._init_tasks()
+        self.labels = self._init_labels()
         self.projects = self._init_projects()
+        self.tasks = self._init_tasks()
+
+    def _init_labels(self):
+        labels = [Label(data=item) for item in self.api.state["labels"]]
+        return labels
 
     def _init_projects(self):
         # First pass: not considering the children or anything.
@@ -586,7 +630,13 @@ class TodoistInterface:
 
     def _init_tasks(self):
         # First pass: not considering the children or anything.
-        tasks = [Task(data=item) for item in self.api.state["items"]]
+        tasks = [
+            Task(
+                data=item,
+                labels=[label for label in self.labels if label.id in item["labels"]],
+            )
+            for item in self.api.state["items"]
+        ]
 
         # Second pass: assigning children.
         for i, task in enumerate(tasks):
