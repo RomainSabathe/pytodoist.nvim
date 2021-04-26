@@ -197,8 +197,7 @@ class Plugin(object):
         label = self.todoist.get_label_by_name(label_name)
 
         # Getting the list of current labels (we want to append to that list).
-        current_labels = task.data["labels"]
-
+        current_labels = task.labels
         task.update(labels=[label["id"], *current_labels])
         self.nvim.command(f"echo 'Task registered with label: {label['name']}.'")
 
@@ -408,6 +407,8 @@ class Task:
     ):
         assert content is not None or data is not None
         self.content = content
+        if data is None:
+            data = dict()
         self.data = data
         self.depth = 0
         self.is_complete = is_complete
@@ -418,12 +419,14 @@ class Task:
             self.content = data["content"]
 
     @abstractmethod
-    def parse(line: str) -> "Task":
+    def parse(line: Union[str, "Task"]) -> "Task":
         # A task is formed as one of these  possibilities:
         # [ ] A task
         # [x] A task
         # [X] A task
         # A task
+        if isinstance(line, Task):
+            return line
         pattern = r"^(\[(?P<status>x|X| )\] )?(?P<content>.*)$"
         match_results = re.match(pattern, line)
 
@@ -434,27 +437,27 @@ class Task:
 
     @property
     def id(self):
-        if self.data is not None:
+        if isinstance(self.data, todoist.models.Item):
             return self.data["id"]
-        return "[Not synced]"
+        return self.data.get("id", "[Not synced]")
 
     @property
     def child_order(self):
-        if self.data is not None:
+        if isinstance(self.data, todoist.models.Item):
             return self.data["child_order"]
-        return 1
+        return self.data.get("child_order", 1)
 
     @property
     def isroot(self):
-        if self.data is not None:
+        if isinstance(self.data, todoist.models.Item):
             return self.data["parent_id"] is None
-        return True
+        return self.data.get("parent_id", True) is None
 
     @property
     def labels(self):
-        if self.data is not None:
+        if isinstance(self.data, todoist.models.Item):
             return self.data["labels"]
-        return []
+        return self.data.get("labels", [])
 
     def __repr__(self) -> str:
         short_content = (
@@ -884,13 +887,9 @@ TodoistObjects = Union[Task, Project, ProjectUnderline, ProjectSeparator]
 
 
 class Diff:
-    def __init__(
-        self,
-        lhs: List[Union[str, TodoistObjects, ParsedBuffer]],
-        rhs: List[Union[str, TodoistObjects, ParsedBuffer]],
-    ):
-        self.lhs = "\n".join([str(item) for item in lhs])
-        self.rhs = "\n".join([str(item) for item in rhs])
+    def __init__(self, lhs: ParsedBuffer, rhs: ParsedBuffer):
+        self.lhs = lhs
+        self.rhs = rhs
 
         self.raw_diff = self.get_raw_diff(self.lhs, self.rhs)
 
@@ -906,22 +905,25 @@ class Diff:
             f"^(?P<from_index>\d+)(,(?P<to_index>\d+))?(?P<action_type>a|c|d)$"
         )
 
-        k = 0
         lines = self.raw_diff  # Shorter name for readibility.
-        while k < len(lines):
-            matches = reg.match(lines[k])
+        i_lines = 0
+        while i_lines < len(lines):
+            matches = reg.match(lines[i_lines])
 
             if matches.group("action_type") in ["a", "c"]:
-                modified_lines = []
-                while lines[k] != ".":
-                    k += 1
-                    modified_lines.append(lines[k])
-                modified_lines = modified_lines[:-1]  # Deleting the last "."
+                modified_items = []
+                from_index = int(matches.group("from_index"))
+                i_group = 0
+                while lines[i_lines] != ".":
+                    i_lines += 1
+                    modified_items.append(self.rhs[from_index + i_group])
+                    i_group += 1
+                modified_items = modified_items[:-1]  # Deleting the last "."
                 yield DiffSegment(
                     matches.group("action_type"),
                     matches.group("from_index"),
                     matches.group("to_index"),
-                    modified_lines,
+                    modified_items,
                 )
 
             elif matches.group("action_type") == "d":
@@ -932,20 +934,20 @@ class Diff:
                     [],
                 )
 
-            k += 1
+            i_lines += 1
 
     @abstractmethod
-    def get_raw_diff(self, lhs: str, rhs: str):
+    def get_raw_diff(self, lhs: ParsedBuffer, rhs: ParsedBuffer):
         # TODO: that's dirty. Ideally we should pipe directly to `diff`.
         path_lhs = Path("/tmp/lhs")
         if path_lhs.exists():
             path_lhs.unlink()
-        path_lhs.write_text(lhs)
+        path_lhs.write_text("\n".join([str(item) for item in lhs]))
 
         path_rhs = Path("/tmp/rhs")
         if path_rhs.exists():
             path_rhs.unlink()
-        path_rhs.write_text(rhs)
+        path_rhs.write_text("\n".join([str(item) for item in rhs]))
 
         diff_output = subprocess.run(
             ["diff", "-e", str(path_lhs), str(path_rhs)], capture_output=True
@@ -961,7 +963,7 @@ class DiffSegment:
     action_type: str
     from_index: Union[str, int]
     to_index: Optional[Union[str, int]]
-    modified_lines: List[str]
+    modified_lines: List[Union[str, Task]]
 
     def __post_init__(self):
         self.from_index: int = int(self.from_index)

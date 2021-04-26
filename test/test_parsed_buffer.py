@@ -938,3 +938,39 @@ def test_add_task_in_custom_section(plugin, vim):
         "[ ] Task 7",
         "",
     ]
+
+def test_create_new_task_and_assign_label(plugin, vim):
+    plugin.load_tasks(args=[])
+
+    # Placing the cursor at `[ ] Task 2`.
+    vim.command("call setpos('.', [1, 4, 1, 0])")
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 2"
+
+    # Adding a new task: Task 10.
+    vim.command("normal oTask 10")
+    plugin._refresh_parsed_buffer()
+    assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 10"
+
+    # Assigning it with the label "Label 2".
+    plugin.assign_label(args=["Label 2"])
+    # plugin._refresh_parsed_buffer()
+
+    # Now let's save the buffer and verify that the program correctly
+    # register the task update.
+    plugin.save_buffer()
+
+    print(plugin.todoist.api.queue)
+    import ipdb; ipdb.set_trace()
+    pass
+    assert isinstance(plugin.todoist.api.queue, list)
+    assert len(plugin.todoist.api.queue) == 1
+
+    # First item to be completed is `Task 8` with id "8". (Recall that the
+    # diff engine gives the diff from bottom to top).
+    item = plugin.todoist.api.queue[0]
+    assert isinstance(item, dict)
+
+    assert item["type"] == "item_update"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["id"] == "2"
+    assert item["args"]["labels"] == ["1"]
