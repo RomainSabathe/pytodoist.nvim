@@ -677,7 +677,7 @@ class TodoistInterface:
         if "date_completed" not in kwargs.keys():
             kwargs["date_completed"] = None
         if "child_order" not in kwargs.keys():
-            kwargs["child_order"] = 99  # TODO: dirty.
+            kwargs["child_order"] = 1  # TODO: dirty.
         if "parent_id" not in kwargs.keys():
             kwargs["parent_id"] = None
         if "labels" not in kwargs.keys():
