@@ -412,6 +412,15 @@ class Label:
     def __repr__(self) -> str:
         return f"Label #{self.id}: {self.name}"
 
+    def __eq__(self, other):
+        if isinstance(other, Label):
+            return self.name == other.name
+        elif isinstance(other, str):
+            return self.name == other
+        else:
+            raise AttributeError()
+
+
     @property
     def id(self):
         if self.data is not None:
@@ -454,10 +463,10 @@ class Task:
         checkbox = r"(\[(?P<status>x|X| )\] )?"
         content = r"(?P<content>.*)"
         labels = r"(?P<label>@\w+)*"
-        pattern = rf"^{checkbox}{content}( | {labels})?$"
+        # TODO: removing the label display for now.
+        # pattern = rf"^{checkbox}{content}( | {labels})?$"
+        pattern = rf"^{checkbox}{content}$"
         match_results = re.match(pattern, line)
-        import ipdb; ipdb.set_trace()
-        pass
 
         status = match_results.group("status")
         content = match_results.group("content")
@@ -506,10 +515,11 @@ class Task:
             buffer += "    "
         buffer += "[ ] " if not self.is_complete else "[X] "
         buffer += self.content
-        if self.labels:
-            buffer += " |"
-            for label in self.labels:
-                buffer += f" {label}"
+        # TODO: removing the label display for now.
+        # if self.labels:
+        #     buffer += " |"
+        #     for label in self.labels:
+        #         buffer += f" {label}"
         return buffer
 
     def __hash__(self):
@@ -706,6 +716,7 @@ class TodoistInterface:
             yield ProjectSeparator()
 
         # We display the custom sections last.
+        # TODO: removing the custom sections for now.
         for custom_section in self.custom_sections:
             yield custom_section
             yield SectionUnderline(custom_section.name)
@@ -961,12 +972,14 @@ class Diff:
             matches = reg.match(lines[i_lines])
 
             if matches.group("action_type") in ["a", "c"]:
+                # TODO: understand why I need to define this.
+                delta = -1 if matches.group("action_type") == "c" else 0
                 modified_items = []
                 from_index = int(matches.group("from_index"))
                 i_group = 0
                 while lines[i_lines] != ".":
                     i_lines += 1
-                    modified_items.append(self.rhs[from_index + i_group])
+                    modified_items.append(self.rhs[from_index + i_group + delta])
                     i_group += 1
                 modified_items = modified_items[:-1]  # Deleting the last "."
                 yield DiffSegment(

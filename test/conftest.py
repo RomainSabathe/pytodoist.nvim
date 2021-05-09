@@ -140,7 +140,9 @@ class FakeApi(todoist.api.TodoistAPI):
 @pytest.fixture
 def custom_sections():
     return [
-        CustomSection(name="Custom Section", filter_fn=lambda task: "1" in task.labels)
+        CustomSection(
+            name="Custom Section", filter_fn=lambda task: "Label 1" in task.labels
+        )
     ]
 
 
