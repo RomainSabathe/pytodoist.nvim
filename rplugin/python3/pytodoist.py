@@ -24,8 +24,8 @@ class Plugin(object):
         self.todoist = TodoistInterface(
             todoist.TodoistAPI(os.environ.get("TODOIST_API_KEY")),
             custom_sections=[
-                CustomSection("Today", lambda task: 2156740858 in task.labels),
-                CustomSection("This Week", lambda task: 2156631975 in task.labels),
+                CustomSection("Today", lambda task: "today" in task.labels),
+                CustomSection("This Week", lambda task: "thisweek" in task.labels),
             ],
         )
         self.parsed_buffer_since_last_save = None
@@ -417,9 +417,14 @@ class Label:
             return self.name == other.name
         elif isinstance(other, str):
             return self.name == other
+        elif isinstance(other, int):
+            if self.data is None:
+                return False
+            return self.data["id"] == other
         else:
-            raise AttributeError()
-
+            raise AttributeError(
+                f"Tried to compare a Label with a {type(other)} object."
+            )
 
     @property
     def id(self):
