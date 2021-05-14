@@ -816,7 +816,7 @@ class ParsedBuffer:
                 continue
 
             # The remaining possibilities are: a proper task or a ProjectSeparator.
-            item = Task.parse(line) if line != "" else ProjectSeparator()
+            item = Task.parse(line) if line.strip() != "" else ProjectSeparator()
             items.append(item)
             k += 1
         return items
@@ -889,7 +889,7 @@ class ParsedBuffer:
 
             for i, (item_before, item_after) in enumerate(zip(befores, afters)):
                 if item_before is None or diff_segment.action_type == "a":
-                    if item_after == "":
+                    if str(item_after).strip() == "":
                         # We prevent from adding an empty task
                         continue
                     new_task = Task.parse(item_after)
