@@ -80,6 +80,36 @@ def test_move_task_1(plugin, vim):
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
     assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 3"
 
+def test_move_task_and_save(plugin, vim):
+    """Move a single task downwards in the buffer."""
+    # Moving `Task 2` to `Project 2`.
+    plugin.load_tasks(args=[])
+
+    # Setting position to `Task 2`, which is located at line 4.
+    line_index = 4
+    vim.api.command(f"call setpos('.', [1, {line_index}, 1, 0])")
+    # Moving this line to `Project 2`.
+    plugin.move_task(args=["Project 2"], _range=[line_index, line_index])
+
+    plugin.save_buffer()
+
+    assert isinstance(plugin.todoist.api.queue, list)
+    assert len(plugin.todoist.api.queue) == 2
+
+    item = plugin.todoist.api.queue[0]
+    assert isinstance(item, dict)
+    assert item["type"] == "item_add"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["content"] == "Task 2"
+    assert item["args"]["project_id"] == "2"
+    assert item["args"]["child_order"] == 99
+
+    item = plugin.todoist.api.queue[1]
+    assert isinstance(item, dict)
+    assert item["type"] == "item_delete"
+    assert isinstance(item["args"], dict)
+    assert item["args"]["id"] == "2"
+
 
 def test_move_task_2(plugin, vim):
     """Move a single task downwards in the buffer, to the last project."""

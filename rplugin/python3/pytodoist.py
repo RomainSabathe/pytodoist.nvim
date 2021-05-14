@@ -978,13 +978,15 @@ class Diff:
 
             if matches.group("action_type") in ["a", "c"]:
                 # TODO: understand why I need to define this.
-                delta = -1 if matches.group("action_type") == "c" else 0
+                # delta = -1 if matches.group("action_type") == "c" else 0
+                # delta = -1
                 modified_items = []
                 from_index = int(matches.group("from_index"))
                 i_group = 0
                 while lines[i_lines] != ".":
                     i_lines += 1
-                    modified_items.append(self.rhs[from_index + i_group + delta])
+                    # modified_items.append(self.rhs[from_index + i_group + delta])
+                    modified_items.append(lines[i_lines])
                     i_group += 1
                 modified_items = modified_items[:-1]  # Deleting the last "."
                 yield DiffSegment(
