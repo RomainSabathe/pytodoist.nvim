@@ -149,6 +149,13 @@ def custom_sections():
 @pytest.fixture
 def plugin(vim, custom_sections):
     to_return = Plugin(vim)
+
+    # Triggering the auto-cmds.
+    to_return.insert_leave()
+    to_return.text_changed()
+    to_return.text_yank_post()
+    to_return.save_buffer()
+
     to_return.todoist = TodoistInterface(FakeApi(), custom_sections=custom_sections)
     to_return.todoist.sync()
     return to_return

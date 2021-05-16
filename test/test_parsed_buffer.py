@@ -80,6 +80,7 @@ def test_move_task_1(plugin, vim):
     # As usual, the -1 handles the difference 0-based indexing and 1-based indexing.
     assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 3"
 
+
 def test_move_task_and_save(plugin, vim):
     """Move a single task downwards in the buffer."""
     # Moving `Task 2` to `Project 2`.
@@ -91,7 +92,7 @@ def test_move_task_and_save(plugin, vim):
     # Moving this line to `Project 2`.
     plugin.move_task(args=["Project 2"], _range=[line_index, line_index])
 
-    plugin.save_buffer()
+    vim.command(":w")
 
     assert isinstance(plugin.todoist.api.queue, list)
     assert len(plugin.todoist.api.queue) == 2
@@ -534,7 +535,6 @@ def test_parsed_buffer_with_complete_tasks(vim, plugin):
     # We fictionaly complete `Task 1` with X.
     vim.current.buffer[2] = "[X] Task 1"
 
-    plugin._refresh_parsed_buffer()
     assert isinstance(plugin.parsed_buffer[2], Task)
     assert plugin.parsed_buffer[2].content == "Task 1"
     assert plugin.parsed_buffer[2].is_complete
@@ -542,7 +542,6 @@ def test_parsed_buffer_with_complete_tasks(vim, plugin):
     # We fictionaly complete `Task 3` with x.
     vim.current.buffer[4] = "[x] Task 3"
 
-    plugin._refresh_parsed_buffer()
     assert isinstance(plugin.parsed_buffer[4], Task)
     assert plugin.parsed_buffer[4].content == "Task 3"
     assert plugin.parsed_buffer[4].is_complete
@@ -550,7 +549,6 @@ def test_parsed_buffer_with_complete_tasks(vim, plugin):
     # Un-doing the task completion for `Task 1`.
     vim.current.buffer[2] = "[ ] Task 1"
 
-    plugin._refresh_parsed_buffer()
     assert isinstance(plugin.parsed_buffer[2], Task)
     assert plugin.parsed_buffer[2].content == "Task 1"
     assert not plugin.parsed_buffer[2].is_complete
@@ -568,8 +566,6 @@ def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
     # of `o`.
     # The other task, however, is created without using `o`.
     vim.command("normal oThis is a new task\nThis is another task")
-
-    plugin._refresh_parsed_buffer()
 
     # The prefix `[ ]` has been automatically added.
     assert (
@@ -608,8 +604,6 @@ def test_adding_new_tasks_without_o_adds_a_prefix(plugin, vim):
     # We also check that manually writing '[ ]' doesn't cause it to appear
     # twice (coming from the user and coming from the script).
     vim.command("normal oTask 10\n[ ] Task 11")
-
-    plugin._refresh_parsed_buffer()
 
     assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 11"
 
@@ -651,7 +645,7 @@ def test_add_task(plugin, vim):
     # We add a new task called `Task 10`.
     vim.command("call setpos('.', [1, 4, 1, 0])")
     vim.command("normal oTask 10")
-    plugin.save_buffer()
+    vim.command(":w")
 
     # We expect the following properties:
     # 1. We added a task (for Todoist, this is an 'item_add' event).
@@ -678,7 +672,7 @@ def test_delete_task(plugin, vim):
     # We delete this task.
     vim.command("call setpos('.', [1, 4, 1, 0])")
     vim.command("normal dd")
-    plugin.save_buffer()
+    vim.command(":w")
 
     assert isinstance(plugin.todoist.api.queue, list)
     assert len(plugin.todoist.api.queue) == 1
@@ -698,7 +692,7 @@ def test_edit_task(plugin, vim):
     # We replace this task with "Task 10"
     vim.command("call setpos('.', [1, 4, 1, 0])")
     vim.command("normal ccTask 10")
-    plugin.save_buffer()
+    vim.command(":w")
 
     # The prefix [ ] should have been added.
     assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 10"
@@ -724,8 +718,6 @@ def test_complete_task(plugin, vim):
     vim.command("call setpos('.', [1, 4, 1, 0])")
     # We call for a task completion.
     plugin.complete_task(args=[])
-
-    plugin._refresh_parsed_buffer()
 
     # The `Task 2` line should have disappeared, and we should be placed on
     # `Task 3`.
@@ -763,14 +755,13 @@ def test_complete_task(plugin, vim):
     # We complete the task by editing the buffer.
     vim.current.buffer[plugin._get_current_line_index() - 1] = "[X] Task 8"
     # After an edit, the program automatically refreshes the buffer.
-    plugin._refresh_parsed_buffer()
 
     # Verifying that the fresh of the buffer didn't move the X somehow.
     assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[X] Task 8"
 
     # Now let's save the buffer and verify that the program correctly
     # register the task completion requests.
-    plugin.save_buffer()
+    vim.command(":w")
 
     assert isinstance(plugin.todoist.api.queue, list)
     assert len(plugin.todoist.api.queue) == 2
@@ -831,7 +822,7 @@ def test_assign_label(plugin, vim):
 
     # Now let's save the buffer and verify that the program correctly
     # register the task update.
-    plugin.save_buffer()
+    vim.command(":w")
 
     assert isinstance(plugin.todoist.api.queue, list)
     assert len(plugin.todoist.api.queue) == 1
@@ -845,6 +836,7 @@ def test_assign_label(plugin, vim):
     assert isinstance(item["args"], dict)
     assert item["args"]["id"] == "2"
     assert item["args"]["labels"] == ["1"]
+
 
 def test_display_custom_section(plugin, vim):
     plugin.load_tasks(args=[True])
@@ -874,6 +866,7 @@ def test_display_custom_section(plugin, vim):
         "[ ] Task 7",
         "",
     ]
+
 
 def test_add_task_in_custom_section(plugin, vim):
     plugin.load_tasks(args=[True])
@@ -911,7 +904,7 @@ def test_add_task_in_custom_section(plugin, vim):
         "",
     ]
 
-    plugin.save_buffer()
+    vim.command(":w")
 
     assert vim.current.buffer[:] == [
         "Project 1",
@@ -969,6 +962,7 @@ def test_add_task_in_custom_section(plugin, vim):
         "",
     ]
 
+
 @pytest.mark.skip(reason="It is known to be broken.")
 def test_create_new_task_and_assign_label(plugin, vim):
     plugin.load_tasks(args=[])
@@ -979,16 +973,14 @@ def test_create_new_task_and_assign_label(plugin, vim):
 
     # Adding a new task: Task 10.
     vim.command("normal oTask 10")
-    plugin._refresh_parsed_buffer()
     assert vim.current.buffer[plugin._get_current_line_index() - 1] == "[ ] Task 10"
 
     # Assigning it with the label "Label 2".
     plugin.assign_label(args=["Label 2"])
-    # plugin._refresh_parsed_buffer()
 
     # Now let's save the buffer and verify that the program correctly
     # register the task update.
-    plugin.save_buffer()
+    vim.command(":w")
 
     print(plugin.todoist.api.queue)
     assert isinstance(plugin.todoist.api.queue, list)
